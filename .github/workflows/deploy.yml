@@ -38,6 +38,17 @@ jobs:
           cp index.html site/
           cp -r pathfinding/slides/dist site/pathfinding
           cp -r simulation forward_kinematics inverse_kinematics motion_planning kineval site/
+          # GitHub Pages only ever consults a 404.html at the site root
+          # (not one nested in a subdirectory), so a deep link into a
+          # specific slide (e.g. /pathfinding/11) 404s unless the root
+          # 404.html can bootstrap that slide's own SPA. Slidev's build
+          # already produces an index.html-equivalent 404.html for exactly
+          # this purpose (see its own absolute-path asset references) --
+          # promote the pathfinding deck's copy to the site root so deep
+          # links into it resolve. If a second Slidev deck needs the same
+          # treatment later, this will need a real path-dispatching
+          # redirect script instead of a single static copy.
+          cp site/pathfinding/404.html site/404.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
