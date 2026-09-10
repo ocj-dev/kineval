@@ -1,0 +1,105 @@
+<!--|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    2D Path Planning in HTML5 Canvas | Main HTML File
+
+    COMPLETED REFERENCE IMPLEMENTATION for the AutoRob (autorob.org) lab-session
+    slides, derived from the kineval-stencil project_pathplan module
+    (github.com/autorob/kineval-stencil). Implements graph-search path
+    planning (A-star, greedy-best-first, breadth-first, depth-first) in
+    graph_search.js. RRT-based planning is out of scope for this deck (see
+    the planned motion_planning/ deck) so rrt.js is intentionally not
+    included here.
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+    Usage: planner will start upon browser loading this file, with execution
+      parameters specifing:
+
+      search_alg: string specifying choice of search algorithm, as one of:
+        "depth-first","breadth-first","greedy-best-first","A-star"
+      planning_scene: string specifying choice of 2D world, as one of:
+        "empty","misc","narrow1","narrow2","three_sections", or the path to
+        a scene file such as "scenes/downtown_gridlock.js"
+      q_init: 2-element 1D array with coordinates of start location
+      q_goal: 2-element 1D array with coordinates of goal location
+      eps: "epsilon" number for search spatial resolution of graph
+      color_scheme: string specifying choice of colors for the canvas, as one of:
+        "default", "light", "blue"
+
+    these parameters can be specified in the URL as parameter assignments
+    separated by question marks, as in the following example:
+
+      search_canvas.html?search_alg=A-star?planning_scene=misc?q_init=[0,0]?q_goal=[4,4]?eps=0.1
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\-->
+
+
+<html>
+
+  <script src="draw.js"></script>
+  <script src="infrastructure.js"></script>
+  <script src="graph_search.js"></script>
+
+  <body onload="init()">
+
+    <p style="font-family:monospace;font-size:14">2D Search Canvas &mdash; AutoRob KinEval reference implementation</p>
+
+    <canvas id="myCanvas" width=800 height=800 style="z-index: 10 ;border:1px solid #000000;">
+    </canvas>
+
+    <script>
+      // Default search algorithm to use for planning
+      search_alg = "A-star";
+
+      // Default scene
+      planning_scene = "misc";
+
+      // Default eps (epsilon) spatial resolution variable
+      eps = 0.1;
+
+      // Default start and goal configurations
+      q_init = [0,0];
+      q_goal = [4,4];
+
+      // Default color scheme
+      color_scheme = "default";
+
+      // Parse user input
+      var url_parsed = window.location.href.split("?");
+      for (i=1; i < url_parsed.length; i++) {
+          var param_parsed = url_parsed[i].split("=");
+          if ((param_parsed[0] !== "search_alg") &&
+              (param_parsed[0] !== "planning_scene") &&
+              (param_parsed[0] !== "color_scheme")) {
+              eval(param_parsed[0]+"="+param_parsed[1]);
+          } else {
+              eval(param_parsed[0]+"=\'"+param_parsed[1]+"\'");
+          }
+      }
+
+      // load planning scene src files dynamically
+      if (planning_scene.includes(".js")) {
+          obstaclesElement = document.createElement('script');
+          obstaclesElement.setAttribute("type", "text/javascript");
+          obstaclesElement.setAttribute("src", planning_scene);
+
+          if (typeof obstaclesElement !== 'undefined') {
+              document.getElementsByTagName("head")[0].appendChild(obstaclesElement);
+          }
+     }
+    </script>
+  </body>
+</html>

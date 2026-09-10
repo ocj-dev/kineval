@@ -1,0 +1,8 @@
+# Not used for actual dependency management (the deck installs via plain
+# npm) -- this file exists solely because Slidev's code-snippet importer
+# (`<<< ../reference/...`) only allows paths inside its detected workspace
+# root, and it detects that root by looking for this exact filename. This
+# marks `pathfinding/` as that root so slides/slides.md can embed snippets
+# directly from ../reference/*.js.
+packages:
+  - 'slides'
