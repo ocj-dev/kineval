@@ -1,4 +1,4 @@
-import type { AStarStep, GridNode, Scene, SearchAlg } from './types'
+import type { AStarStep, GridNode, HeapEntry, Scene, SearchAlg } from './types'
 
 // A step-generator port of ../../reference/graph_search.js for driving the
 // interactive visualization in the browser. It is kept structurally
@@ -8,7 +8,9 @@ import type { AStarStep, GridNode, Scene, SearchAlg } from './types'
 // files directly via Slidev snippet-import, so what you read there is
 // always the real shipped code, not this port. `line` on every yielded
 // step matches the pseudocode line numbers used in both that slide and the
-// comments in graph_search.js.
+// comments in graph_search.js -- every pseudocode line gets its own step,
+// so stepping through the trace one entry at a time walks the pseudocode
+// one line at a time.
 
 // shared key format for looking up a world coordinate in a visited/queued
 // Set -- used by useAStarTracer.ts (to build the sets) and MapCanvas.vue
@@ -76,16 +78,21 @@ function heapExtract(heap: GridNode[]): GridNode {
   return minElement
 }
 
-export function buildGrid(scene: Scene, eps: number): { grid: GridNode[][]; start: GridNode } {
+function heapSnapshot(heap: GridNode[]): HeapEntry[] {
+  return heap.map((n) => ({ i: n.i, j: n.j, x: n.x, y: n.y, priority: n.priority! }))
+}
+
+export function buildGrid(scene: Scene): { grid: GridNode[][]; start: GridNode } {
+  const { xMin, xMax, yMin, yMax, eps } = scene.gridBounds
   const grid: GridNode[][] = []
   let closestStart: GridNode | null = null
   let closestDist = Infinity
 
   let iind = 0
-  for (let xpos = -2; xpos < 7; xpos += eps) {
+  for (let xpos = xMin; xpos < xMax; xpos += eps) {
     grid[iind] = []
     let jind = 0
-    for (let ypos = -2; ypos < 7; ypos += eps) {
+    for (let ypos = yMin; ypos < yMax; ypos += eps) {
       const node: GridNode = {
         i: iind, j: jind, x: xpos, y: ypos,
         parent: null, distance: 10000, visited: false, priority: null, queued: false,
@@ -115,12 +122,13 @@ export function buildGrid(scene: Scene, eps: number): { grid: GridNode[][]; star
 //  8          if the neighbor is off the grid or in collision, skip it
 //  9          tentative_distance = current.distance + eps
 // 10          if tentative_distance < neighbor.distance
-// 11              record this cheaper path: neighbor.distance, neighbor.parent
+// 11              update routing through visited cell
 // 12              neighbor.priority = f(neighbor)
 // 13              insert the neighbor into the open queue
 // 14  the open queue emptied out -- no path exists; fail
-export function* aStarSteps(scene: Scene, searchAlg: SearchAlg = 'A-star', eps = 0.2): Generator<AStarStep, void, unknown> {
-  const { grid, start } = buildGrid(scene, eps)
+export function* aStarSteps(scene: Scene, searchAlg: SearchAlg = 'A-star'): Generator<AStarStep, void, unknown> {
+  const { grid, start } = buildGrid(scene)
+  const eps = scene.gridBounds.eps
 
   start.distance = 0
   start.priority = 0
@@ -129,23 +137,26 @@ export function* aStarSteps(scene: Scene, searchAlg: SearchAlg = 'A-star', eps =
   heapInsert(visitQueue, start)
   let expansionCounter = 0
 
-  yield { line: 1, action: 'queue', node: { x: start.x, y: start.y } }
+  yield { line: 1, action: 'init', current: { x: start.x, y: start.y }, heap: heapSnapshot(visitQueue) }
 
   for (;;) {
+    yield { line: 2, action: 'check-queue', heap: heapSnapshot(visitQueue) }
     if (visitQueue.length === 0) {
-      yield { line: 14, action: 'fail' }
+      yield { line: 14, action: 'fail', heap: [] }
       return
     }
 
     const current = heapExtract(visitQueue)
+    yield { line: 3, action: 'pop', current: { x: current.x, y: current.y }, heap: heapSnapshot(visitQueue) }
 
     if (current.visited) {
-      yield { line: 4, action: 'discard-stale', node: { x: current.x, y: current.y } }
+      yield { line: 4, action: 'discard-stale', current: { x: current.x, y: current.y }, heap: heapSnapshot(visitQueue) }
       continue
     }
+    yield { line: 4, action: 'discard-stale', current: { x: current.x, y: current.y }, heap: heapSnapshot(visitQueue) }
 
     current.visited = true
-    yield { line: 5, action: 'visit', node: { x: current.x, y: current.y } }
+    yield { line: 5, action: 'visit', current: { x: current.x, y: current.y }, heap: heapSnapshot(visitQueue) }
 
     const distToGoal = Math.hypot(current.x - scene.qGoal[0], current.y - scene.qGoal[1])
     if (distToGoal <= eps) {
@@ -155,32 +166,63 @@ export function* aStarSteps(scene: Scene, searchAlg: SearchAlg = 'A-star', eps =
         path.push({ x: ref.x, y: ref.y })
         ref = ref.parent
       }
-      yield { line: 6, action: 'succeed', node: { x: current.x, y: current.y }, path }
+      yield { line: 6, action: 'succeed', current: { x: current.x, y: current.y }, path, heap: heapSnapshot(visitQueue) }
       return
     }
+    yield { line: 6, action: 'not-goal', current: { x: current.x, y: current.y }, heap: heapSnapshot(visitQueue) }
 
     const neighborOffsets: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
     for (const [di, dj] of neighborOffsets) {
       const ni = current.i + di
       const nj = current.j + dj
-      if (ni < 0 || ni >= grid.length || nj < 0 || nj >= grid[ni].length) continue
+      const inBounds = ni >= 0 && ni < grid.length && nj >= 0 && nj < grid[ni].length
+      const neighborCoords = inBounds ? { x: grid[ni][nj].x, y: grid[ni][nj].y } : { x: current.x + di * eps, y: current.y + dj * eps }
+
+      yield { line: 7, action: 'consider-neighbor', current: { x: current.x, y: current.y }, neighbor: neighborCoords, heap: heapSnapshot(visitQueue) }
+
+      if (!inBounds || testCollision(scene, [neighborCoords.x, neighborCoords.y])) {
+        yield { line: 8, action: 'skip-neighbor', current: { x: current.x, y: current.y }, neighbor: neighborCoords, heap: heapSnapshot(visitQueue) }
+        continue
+      }
+      yield { line: 8, action: 'neighbor-ok', current: { x: current.x, y: current.y }, neighbor: neighborCoords, heap: heapSnapshot(visitQueue) }
 
       const neighbor = grid[ni][nj]
-      if (testCollision(scene, [neighbor.x, neighbor.y])) continue
-
       const tentativeDistance = current.distance + eps
+      yield {
+        line: 9, action: 'tentative', current: { x: current.x, y: current.y },
+        neighbor: neighborCoords, tentativeDistance, heap: heapSnapshot(visitQueue),
+      }
+
       if (tentativeDistance < neighbor.distance) {
+        yield {
+          line: 10, action: 'relax-check', current: { x: current.x, y: current.y },
+          neighbor: neighborCoords, tentativeDistance, heap: heapSnapshot(visitQueue),
+        }
+
         neighbor.distance = tentativeDistance
         neighbor.parent = current
+        yield {
+          line: 11, action: 'relax', current: { x: current.x, y: current.y },
+          neighbor: neighborCoords, tentativeDistance, heap: heapSnapshot(visitQueue),
+        }
+
         neighbor.priority = computePriority(neighbor, scene.qGoal, searchAlg, expansionCounter)
         expansionCounter++
+        yield {
+          line: 12, action: 'priority', current: { x: current.x, y: current.y },
+          neighbor: neighborCoords, neighborPriority: neighbor.priority, heap: heapSnapshot(visitQueue),
+        }
+
         neighbor.queued = true
         heapInsert(visitQueue, neighbor)
         yield {
-          line: 13,
-          action: 'queue',
-          node: { x: current.x, y: current.y },
-          neighbor: { x: neighbor.x, y: neighbor.y },
+          line: 13, action: 'enqueue', current: { x: current.x, y: current.y },
+          neighbor: neighborCoords, neighborPriority: neighbor.priority, heap: heapSnapshot(visitQueue),
+        }
+      } else {
+        yield {
+          line: 10, action: 'no-relax', current: { x: current.x, y: current.y },
+          neighbor: neighborCoords, tentativeDistance, heap: heapSnapshot(visitQueue),
         }
       }
     }

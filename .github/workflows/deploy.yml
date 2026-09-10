@@ -38,6 +38,14 @@ jobs:
           cp index.html site/
           cp -r pathfinding/slides/dist site/pathfinding
           cp -r simulation forward_kinematics inverse_kinematics motion_planning kineval site/
+          # the 2D path-planning reference implementation is a plain,
+          # dependency-free static app (no build step) -- serve it directly
+          # at kineval/pathplanning/, alongside (not instead of) the
+          # full-3D-viewer placeholder already copied into site/kineval/
+          # above.
+          mkdir -p site/kineval/pathplanning
+          cp -r pathfinding/reference/. site/kineval/pathplanning/
+          cp site/kineval/pathplanning/search_canvas.html site/kineval/pathplanning/index.html
           # GitHub Pages only ever consults a 404.html at the site root
           # (not one nested in a subdirectory), so a deep link into a
           # specific slide (e.g. /pathfinding/11) 404s unless the root

@@ -57,6 +57,7 @@ function initSearchGraph() {
     for (iind=0,xpos=-2;xpos<7;iind++,xpos+=eps) {
         G[iind] = [];
         for (jind=0,ypos=-2;ypos<7;jind++,ypos+=eps) {
+            // #region grid-node-fields
             G[iind][jind] = {
                 i:iind,j:jind, // mapping to graph array
                 x:xpos,y:ypos, // mapping to map coordinates
@@ -66,6 +67,7 @@ function initSearchGraph() {
                 priority:null, // visit priority based on fscore
                 queued:false // flag for whether the node has been queued for visiting
             };
+            // #endregion grid-node-fields
 
             // STENCIL: determine whether this graph node should be the start
             //   point for the search
@@ -77,6 +79,7 @@ function initSearchGraph() {
         }
     }
 
+    // #region init-start
     // pseudocode line 1: the start node has zero distance from itself and
     //   is the first node queued for visiting
     closest_start_node.distance = 0;
@@ -84,6 +87,7 @@ function initSearchGraph() {
     closest_start_node.queued = true;
     minheap_insert(visit_queue, closest_start_node);
     node_start = closest_start_node;
+    // #endregion init-start
 }
 
 function iterateGraphSearch() {
@@ -103,6 +107,7 @@ function iterateGraphSearch() {
     //   drawHighlightedPathGraph - draws a path back to the start location
     //   draw_2D_configuration - draws a square at a given location
 
+    // #region main-loop
     // pseudocode line 2: search fails once the open queue is exhausted
     //   without having reached the goal
     if (visit_queue.length === 0)
@@ -132,7 +137,9 @@ function iterateGraphSearch() {
         drawHighlightedPathGraph(current_node);
         return "succeeded";
     }
+    // #endregion main-loop
 
+    // #region neighbor-loop
     // pseudocode line 7: expand the 4-connected neighbors of this node
     //   (grid indices are adjacent by construction, since eps is both the
     //   node spacing in world coordinates and the index step)
@@ -175,10 +182,12 @@ function iterateGraphSearch() {
             minheap_insert(visit_queue, neighbor);
         }
     }
+    // #endregion neighbor-loop
 
     return "iterating";
 }
 
+// #region priority-formula
 // pseudocode line 12: a node's search priority is f = g + h for A-star
 //   (g = distance-from-start so far, h = an admissible heuristic estimate of
 //   the remaining distance to the goal); greedy-best-first uses only h;
@@ -200,6 +209,7 @@ function computeNodePriority(node) {
             return node.distance + heuristic;
     }
 }
+// #endregion priority-formula
 
 //////////////////////////////////////////////////
 /////     MIN HEAP IMPLEMENTATION FUNCTIONS
@@ -208,6 +218,7 @@ function computeNodePriority(node) {
     // STENCIL: implement min heap functions for graph search priority queue.
     //   These functions work use the 'priority' field for elements in graph.
 
+// #region insert-queue
 // standard array-backed binary min-heap: insert appends the new element
 //   then "sifts up" by repeatedly swapping with its parent while it is
 //   smaller, restoring the heap invariant in O(log n)
@@ -224,7 +235,9 @@ function minheap_insert(heap, new_element) {
         idx = parent_idx;
     }
 }
+// #endregion insert-queue
 
+// #region pop-min
 // extract-min swaps the root with the last element, pops the (old) root off
 //   the end, then "sifts down" the new root by repeatedly swapping with its
 //   smaller child until the heap invariant is restored, also O(log n)
@@ -254,6 +267,7 @@ function minheap_extract(heap) {
 
     return min_element;
 }
+// #endregion pop-min
 
 // assign heap operations within a minheaper object, matching the
 //   tutorial_heapsort convention used elsewhere in the KinEval stencil

@@ -41,22 +41,37 @@ layout: default
 
 # A brief history of graph search
 
-<div class="grid grid-cols-2 gap-4 mt-4 text-sm">
-<div class="panel">
+<div class="split-panel">
+<div class="panel text-sm">
 
 In 1959, **Edsger Dijkstra** published an algorithm for finding shortest paths in a weighted
 graph by always expanding the closest not-yet-visited node — optimal, but with no sense of
 *direction* toward a particular goal. In 1968, **Peter Hart, Nils Nilsson, and Bertram
-Raphael**, working on the Shakey robot project at the Stanford Research Institute, generalized
-this into **A-star**: add an admissible heuristic estimate of remaining distance to the goal, and
-the search remains provably optimal while exploring far fewer nodes. Shakey needed exactly this —
-a mobile robot planning routes through a room of obstacles — making A-star, from its very first
-publication, a *robotics* algorithm.
+Raphael**, working on the [Shakey](https://en.wikipedia.org/wiki/Shakey_the_robot) robot project
+at the Stanford Research Institute, generalized this into **A-star**: add an admissible
+heuristic estimate of remaining distance to the goal, and the search remains provably optimal
+while exploring far fewer nodes.
+
+Shakey needed exactly this — a mobile robot planning routes through a room of obstacles —
+making A-star, from its very first publication, a *robotics* algorithm.
 
 </div>
-<div class="panel">
+<div>
+<div class="side-image">
+<img src="/images/shakey.jpg" alt="Shakey the robot on display at the Computer History Museum" />
+</div>
+<div class="side-caption">Shakey the Robot, SRI International, 1966–1972 &#183; Computer History Museum. Credit: Wikimedia Commons.</div>
+</div>
+</div>
 
-**Why it still matters**
+---
+layout: default
+---
+
+# Why it still matters
+
+<div class="split-panel">
+<div class="panel text-sm">
 
 A-star (and its many descendants — D*, Anytime A*, Theta*) is the routing engine behind mapping
 software, video-game pathfinding, and robot navigation stacks alike. This lab's 2D grid-world
@@ -64,6 +79,30 @@ version is a direct ancestor of the occupancy-grid path planner used in this cou
 pubsub project (`astar_node.rs`, visualized in `frontend/astar.html`) — the same algorithm, the
 same admissible-heuristic argument, just a different systems architecture around it.
 
+The same idea now routes commuters, delivers packages, and steers robots across the University
+of Michigan's own backyard: a **May Mobility** autonomous shuttle navigating Detroit streets, an
+**Agility Robotics** humanoid delivering a package inside the Ford Robotics Building, an
+**MBot** mobile-robotics education platform planning across a classroom floor, and — the
+original use case — turn-by-turn directions across town.
+
+</div>
+<div class="collage">
+<figure>
+  <img src="/images/may-mobility.jpg" alt="A May Mobility autonomous shuttle in Detroit" />
+  <figcaption>May Mobility autonomous shuttle, Detroit</figcaption>
+</figure>
+<figure>
+  <img src="/images/agility-digit.jpg" alt="An Agility Robotics Digit humanoid carrying a package" />
+  <figcaption>Agility Robotics Digit, Ford Robotics Building, UM</figcaption>
+</figure>
+<figure>
+  <img src="/images/mbot-omni.jpg" alt="An MBot omni-wheel education robot" />
+  <figcaption>MBot Omni education robot</figcaption>
+</figure>
+<figure>
+  <img src="/images/route-map.jpg" alt="A driving route from the UM Robotics Building to Detroit Street Filling Station" />
+  <figcaption>Robotics Building &rarr; Detroit St. Filling Station (OpenStreetMap route, standing in for an Apple Maps snapshot)</figcaption>
+</figure>
 </div>
 </div>
 
@@ -115,6 +154,109 @@ admissible heuristic is exactly what guarantees A-star still finds the *shortest
 </div>
 </div>
 
+<div class="mt-2 text-xs opacity-60">
+Next: a hand-worked example on a tiny grid, before diving into the real code.
+</div>
+
+---
+layout: default
+---
+
+# Setup: a uniform grid, by hand
+
+<div class="grid grid-cols-2 gap-4 mt-2">
+<div class="panel text-sm">
+
+A 3-column by 4-row grid, small enough to work through by hand:
+
+- **Start (A)** is the lowermost-left cell.
+- **Goal (B)** is the uppermost-right cell.
+- The second-from-bottom row is entirely blocked, **except its leftmost cell** — the only way
+  from the bottom half of the grid to the top half.
+
+Every cell is a candidate node, exactly as `initSearchGraph()` builds one for the real
+`[-2,7)×[-2,7)` kineval-stencil world — just three columns and four rows instead of forty-five
+by forty-five.
+
+</div>
+<div class="panel" style="min-height: 300px; display:flex;">
+<StaticMiniGrid />
+</div>
+</div>
+
+---
+layout: default
+---
+
+# What every grid cell tracks
+
+<div class="panel text-xs mt-2">
+Four fields per cell are all the search needs: <code>distance</code> (cost of the cheapest path
+found so far), <code>parent</code> (the neighbor that path arrives from — this is what lets the
+search reconstruct a route at the end), <code>visited</code> (finalized, never revisited), and
+<code>priority</code> (what the open-queue heap sorts on).
+</div>
+
+<<< ../reference/graph_search.js#grid-node-fields {*}{lines:true,startLine:61}
+
+---
+layout: default
+---
+
+# The open queue: a first look
+
+<div class="content-body">
+<AStarPanel initial-scene="simple_3x4" :show-alg-picker="false" :show-scene-picker="false" :speed-ms="250" />
+</div>
+
+<!--
+Step forward a few times: the start node is queued (line 1), the loop
+checks the queue (line 2), pops the only entry (line 3), and marks it
+visited (line 5) -- the open-queue block on the left shows the heap array
+shrink from one entry to zero, right before the goal check and neighbor
+expansion begin.
+-->
+
+---
+layout: default
+---
+
+# The admissible heuristic
+
+<div class="panel text-sm mt-4">
+
+For a 4-connected grid, the true remaining cost from any cell to the goal is at least its
+**Euclidean (straight-line) distance** — grid moves can only ever be as short as a straight
+line, never shorter. That's exactly what makes `h = Euclidean distance to goal` **admissible**:
+it never overestimates.
+
+This is the whole argument for why A-star is optimal: as long as `h` never overestimates, the
+first time A-star pops the goal off the open queue, `g` at that moment is guaranteed to be the
+true shortest distance — no cheaper path could still be waiting in the queue, because anything
+cheaper would have had a smaller `f = g + h` and been popped first.
+
+Drop the `g` term entirely (priority `= h` alone) and you get **greedy-best-first** — fast, but
+no longer guaranteed optimal, since it can be lured toward a dead end that merely *looks* close
+to the goal. The Cul-de-Sac test case later in this deck shows exactly that happening.
+
+</div>
+
+---
+layout: default
+---
+
+# Step through the simple grid
+
+<div class="content-body">
+<AStarPanel initial-scene="simple_3x4" :show-scene-picker="false" :speed-ms="180" />
+</div>
+
+<!--
+The full search to completion on the 12-cell example: watch the open-queue
+heap blocks, the distance labels inside each visited/queued cell, and the
+bold parent-edge tree grow up through the gap in the obstacle row.
+-->
+
 ---
 layout: default
 ---
@@ -123,18 +265,21 @@ layout: default
 
 <div class="panel text-sm mt-4">
 
-Following the pseudocode's own dependency order, the reference implementation
-(`kineval/pathfinding/reference/graph_search.js`) breaks down into:
+The next several slides walk the reference implementation
+(`kineval/pathfinding/reference/graph_search.js`) one pseudocode line at a time, in dependency
+order — the two heap primitives first (everything else calls them), then setup, then the
+heuristic, then the two loop bodies, then how the result gets turned into a path:
 
-1. **The priority queue** — a binary min-heap over each node's `priority` field (pseudocode lines 3, 13)
-2. **Building the search graph** — laying out the grid and locating the start node (line 1)
-3. **The admissible heuristic and priority formula** — `f = g + h` (line 12)
-4. **The main search loop** — pop, discard stale entries, visit, goal test (lines 2&ndash;6)
-5. **Expanding neighbors** — collision checks and edge relaxation (lines 7&ndash;13)
-6. **Reconstructing the path** — walking `parent` pointers back to the start (line 6)
+1. **Line 3** — pop the minimum-priority node (`minheap_extract`)
+2. **Line 13** — insert a node into the open queue (`minheap_insert`)
+3. **Line 1** — initialize the open queue with the start node
+4. **Line 12** — the priority formula, `f = g + h`
+5. **Lines 2–6** — the main loop: pop, discard stale entries, visit, goal test
+6. **Lines 7–13** — expanding neighbors: collision checks and edge relaxation
+7. **Line 6**, revisited — reconstructing the path once the goal is reached
 
-Every snippet on the following slides is imported directly from the shipped reference file — not
-retyped — so what you read here is exactly what runs.
+Every snippet is imported directly from the shipped reference file — not retyped — with line
+numbers matching that file exactly.
 
 </div>
 
@@ -142,90 +287,101 @@ retyped — so what you read here is exactly what runs.
 layout: default
 ---
 
-# Component: the priority queue
-
-<div class="grid grid-cols-1 gap-2 mt-2 text-xs">
-<div class="panel">
-A standard array-backed binary min-heap, keyed on each node's <code>priority</code>. Insert
-appends and "sifts up"; extract swaps the root with the last element and "sifts down" &mdash;
-both O(log n). A node may be pushed more than once if a cheaper path to it is found later; the
-main loop discards stale duplicates lazily when they're popped (next slide).
-</div>
-</div>
-
-<<< ../reference/graph_search.js#L214-L256 {maxHeight:'330px'}
-
----
-layout: default
----
-
-# Component: building the search graph
+# Line 3: pop the minimum-priority node
 
 <div class="panel text-xs mt-2">
-Lays a uniform grid of candidate locations over the 2D world, spaced <code>eps</code> apart, and
-locates the grid node closest to <code>q_init</code> as the search's start &mdash; since the true
-start location generally won't land exactly on a grid point.
+<code>minheap_extract</code> swaps the root with the last element, pops the old root off the
+end, then "sifts down" the new root by repeatedly swapping with its smaller child until the
+heap invariant is restored — O(log n).
 </div>
 
-<<< ../reference/graph_search.js#L37-L87 {maxHeight:'330px'}
+<<< ../reference/graph_search.js#pop-min {*}{lines:true,startLine:241}
 
 ---
 layout: default
 ---
 
-# Component: the heuristic and priority formula
+# Line 13: insert into the open queue
 
 <div class="panel text-xs mt-2">
-<code>f = g + h</code> for A-star: <code>g</code> is <code>node.distance</code> (actual cost so
-far), <code>h</code> is the Euclidean distance remaining to the goal. Swapping in a different
-formula turns the very same search loop into greedy-best-first, breadth-first, or a depth-first
-emulation &mdash; try the <b>Algorithm</b> picker on the next-but-one slide.
+<code>minheap_insert</code> appends the new element, then "sifts up" by repeatedly swapping with
+its parent while it is smaller — also O(log n). A node may be inserted more than once if a
+cheaper path to it is found later; the main loop's stale-entry check (line 4) discards the
+leftover duplicate lazily when it is eventually popped.
 </div>
 
-<<< ../reference/graph_search.js#L182-L202 {maxHeight:'330px'}
+<<< ../reference/graph_search.js#insert-queue {*}{lines:true,startLine:222}
 
 ---
 layout: default
 ---
 
-# Component: the main search loop
+# Line 1: initialize the open queue
+
+<div class="panel text-xs mt-2">
+The start location generally won't land exactly on a grid point, so <code>initSearchGraph()</code>
+tracks the single closest grid node while building the grid, then queues that node with zero
+distance — the seed the entire search grows from.
+</div>
+
+<<< ../reference/graph_search.js#init-start {*}{lines:true,startLine:83}
+
+---
+layout: default
+---
+
+# Line 12: the priority formula
+
+<div class="panel text-xs mt-2">
+<code>f = g + h</code> for A-star. Swapping in a different formula turns this very same search
+loop into greedy-best-first, breadth-first, or a depth-first emulation — the reference
+implementation supports all four via the <code>search_alg</code> switch.
+</div>
+
+<<< ../reference/graph_search.js#priority-formula {*}{lines:true,startLine:191}
+
+---
+layout: default
+---
+
+# Lines 2–6: the main loop
 
 <div class="panel text-xs mt-2">
 Each call to <code>iterateGraphSearch()</code> performs <i>one</i> queue-pop-and-visit step, then
-returns control to the browser's animation loop &mdash; an explicit <code>while</code> loop here
-would block the page and make it unresponsive. This per-call structure is exactly what makes
-Play/Pause/Step possible in the visualization on the next slide: one call is one step.
+returns control to the browser's animation loop — an explicit <code>while</code> loop here would
+block the page. This per-call structure is exactly what makes Play/Pause/Step possible in this
+deck's visualizations: one call is one step.
 </div>
 
-<<< ../reference/graph_search.js#L89-L134 {maxHeight:'310px'}
+<<< ../reference/graph_search.js#main-loop {*}{lines:true,startLine:111}
 
 ---
 layout: default
 ---
 
-# Component: expanding neighbors
+# Lines 7–13: expanding neighbors
 
 <div class="panel text-xs mt-2">
 For each of the 4-connected neighbors: skip anything off-grid or in collision, compute the cost
-of stepping there, and <i>relax</i> the edge &mdash; update the neighbor's distance/parent/priority
-and (re)queue it &mdash; only if this path to it is cheaper than any found before.
+of stepping there, and <i>relax</i> the edge — update the neighbor's distance/parent/priority and
+(re)queue it — only if this path to it is cheaper than any found before.
 </div>
 
-<<< ../reference/graph_search.js#L136-L177 {maxHeight:'330px'}
+<<< ../reference/graph_search.js#neighbor-loop {*}{lines:true,startLine:143}
 
 ---
 layout: default
 ---
 
-# Component: reconstructing the path
+# Line 6, revisited: reconstructing the path
 
 <div class="panel text-xs mt-2">
 Once the goal is reached, the path is just the chain of <code>parent</code> pointers back to the
-start &mdash; walked once here to draw it, exactly the same chain the visualization walks to
-render its blue route line.
+start — walked once here to draw it, exactly the same chain this deck's visualizations walk to
+render their blue route line and bold parent-edge tree.
 </div>
 
-<<< ../reference/draw.js#L63-L112 {maxHeight:'330px'}
+<<< ../reference/draw.js#path-reconstruct {*}{lines:true,startLine:64}
 
 ---
 layout: default
@@ -234,13 +390,17 @@ layout: default
 # Watch it search
 
 <div class="content-body">
-<AStarPanel initial-scene="misc" initial-alg="A-star" :speed-ms="10" />
+<AStarPanel initial-scene="misc" initial-alg="A-star" :speed-ms="4" />
 </div>
 
 <!--
 Interactive: Start/Pause/Step Forward/Step Back/Reset, plus scene and
-algorithm pickers. The pseudocode line highlighted on the left always
-matches the step being drawn on the map.
+algorithm pickers. Every pseudocode line gets its own step, so stepping
+forward walks the pseudocode one line at a time; Play runs the full trace.
+The legend above the map explains the cell colors, the numbers inside
+visited/queued cells are their current distance, the bold blue lines are
+the search tree of parent edges, and the dashed red line from a
+just-queued cell to the goal shows its f-score.
 -->
 
 ---
@@ -273,7 +433,7 @@ layout: default
 # Try every test case
 
 <div class="content-body">
-<AStarPanel initial-scene="downtown_gridlock" :show-alg-picker="true" :speed-ms="8" />
+<AStarPanel initial-scene="downtown_gridlock" :show-alg-picker="true" :speed-ms="3" />
 </div>
 
 <!--
@@ -287,11 +447,41 @@ end and settles for a longer one.
 
 ---
 layout: default
+---
+
+# Try this yourself
+
+<div class="panel text-sm mt-2">
+
+The reference implementation runs standalone, no build step, straight from `search_canvas.html`.
+Every run is configured entirely through URL parameters:
+
+| Parameter | Values | Meaning |
+|---|---|---|
+| `search_alg` | `A-star`, `greedy-best-first`, `breadth-first`, `depth-first` | which priority formula drives the search |
+| `planning_scene` | a built-in name, or a path like `scenes/spiral.js` | which obstacle layout to load |
+| `q_init` | `[x,y]` | start location |
+| `q_goal` | `[x,y]` | goal location |
+| `eps` | a number | grid spacing (smaller = finer, slower) |
+| `color_scheme` | `default`, `light`, `blue` | canvas color palette |
+
+```text
+search_canvas.html?search_alg=A-star?planning_scene=scenes/spiral.js?q_init=[0,0]?q_goal=[4,4]?eps=0.2
+```
+
+**Run it live:** [ocj-dev.github.io/kineval/kineval/pathplanning](https://ocj-dev.github.io/kineval/kineval/pathplanning/)
+
+</div>
+
+---
+layout: default
 class: text-center
 ---
 
 <div class="content-body image-slide">
-<CampusMapCloser />
+<a href="https://robots.engin.umich.edu/Projects/NGV" target="_blank" class="side-image" style="display:inline-block;max-height:76%;">
+<img src="/images/ford-fusion-ngv.jpg" class="hero-image" alt="A Ford Fusion Next Generation Vehicle autonomous research car" />
+</a>
 <div class="image-caption">Go Blue!</div>
-<div class="image-credit">A course robot, parked at the Diag &#183; illustration coded for this deck (no image-generation tool was available in this environment)</div>
+<div class="image-credit">Ford Fusion Next Generation Vehicle &#183; <a href="https://robots.engin.umich.edu/Projects/NGV">robots.engin.umich.edu/Projects/NGV</a></div>
 </div>

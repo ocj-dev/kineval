@@ -10,9 +10,10 @@ withDefaults(
     sceneId: string
     searchAlg: SearchAlg
     showAlgPicker?: boolean
+    showScenePicker?: boolean
     compact?: boolean
   }>(),
-  { isDone: false, isAtStart: false, showAlgPicker: true, compact: false },
+  { isDone: false, isAtStart: false, showAlgPicker: true, showScenePicker: true, compact: false },
 )
 
 const emit = defineEmits<{
@@ -43,7 +44,7 @@ const algOptions: { id: SearchAlg; label: string }[] = [
       <button class="btn-maps" @click="emit('reset')">⟲ Reset</button>
     </div>
     <div class="row pickers">
-      <label class="picker">
+      <label v-if="showScenePicker" class="picker">
         <span>Scene</span>
         <select :value="sceneId" @change="emit('update:sceneId', ($event.target as HTMLSelectElement).value)">
           <option v-for="s in scenes" :key="s.id" :value="s.id">{{ s.name }}{{ s.isNew ? ' (new)' : '' }}</option>

@@ -1,4 +1,8 @@
-import type { Scene } from './types'
+import type { GridBounds, Scene } from './types'
+
+// The search grid extent/resolution shared by every kineval-stencil-derived
+// scene -- matches initSearchGraph() in ../../reference/graph_search.js.
+const STANDARD_BOUNDS: GridBounds = { xMin: -2, xMax: 7, yMin: -2, yMax: 7, eps: 0.2 }
 
 // World boundary walls, mirroring setPlanningScene() in
 // ../../reference/infrastructure.js -- every scene includes these.
@@ -25,6 +29,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: false,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'misc',
@@ -39,6 +44,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: false,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'narrow1',
@@ -52,6 +58,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: false,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'narrow2',
@@ -66,6 +73,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: false,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'three_sections',
@@ -80,6 +88,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: false,
+    gridBounds: STANDARD_BOUNDS,
   },
 
   // Five new scenes authored for this deck (also shipped as
@@ -96,6 +105,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: true,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'diagonal_staircase',
@@ -109,6 +119,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: true,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'spiral',
@@ -129,6 +140,7 @@ export const scenes: Scene[] = [
     qInit: [-0.65, 2.0],
     qGoal: [2, 2],
     isNew: true,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'cul_de_sac',
@@ -141,6 +153,7 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: true,
+    gridBounds: STANDARD_BOUNDS,
   },
   {
     id: 'construction_detour',
@@ -153,11 +166,34 @@ export const scenes: Scene[] = [
     qInit: [0, 0],
     qGoal: [4, 4],
     isNew: true,
+    gridBounds: STANDARD_BOUNDS,
   },
 ]
 
+// A tiny, purpose-built 3-column x 4-row teaching grid, used by the
+// "algorithmic process" walkthrough slides (setup, cell fields, heap
+// example, step-through) -- not one of the kineval-stencil test cases, so
+// it isn't part of the `scenes` list above or the test-case table. Start is
+// the lowermost-left cell, goal is the uppermost-right cell, and every cell
+// in the second-from-bottom row is an obstacle except its leftmost cell,
+// forcing one clean detour.
+export const miniGridScene: Scene = {
+  id: 'simple_3x4',
+  name: 'Simple 3x4 grid',
+  description: 'A tiny hand-worked example: 3 columns, 4 rows, one obstacle row with a single gap on the left.',
+  obstacles: [
+    [[1, 1], [1, 1]],
+    [[2, 2], [1, 1]],
+  ],
+  qInit: [0, 0],
+  qGoal: [2, 3],
+  isNew: false,
+  gridBounds: { xMin: 0, xMax: 3, yMin: 0, yMax: 4, eps: 1 },
+  renderBounds: { xMin: 0, xMax: 3, yMin: 0, yMax: 4 },
+}
+
 export function sceneById(id: string): Scene {
-  const scene = scenes.find((s) => s.id === id)
+  const scene = [...scenes, miniGridScene].find((s) => s.id === id)
   if (!scene) throw new Error(`unknown scene: ${id}`)
   return scene
 }

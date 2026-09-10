@@ -60,6 +60,7 @@ function draw_2D_configuration(q, style) {
                  size, size);
 }
 
+// #region path-reconstruct
 function drawHighlightedPathGraph(current_node) {
 
     // once this method has been called, redraw the path until told otherwise
@@ -110,6 +111,7 @@ function drawHighlightedPathGraph(current_node) {
 
 
 }
+// #endregion path-reconstruct
 
 function draw_2D_edge_configurations(q1,q2) {
     // draw line between locations of two 2D configurations on canvas

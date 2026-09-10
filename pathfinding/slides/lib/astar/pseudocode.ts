@@ -1,5 +1,11 @@
 // Matches the pseudocode-line comments in ../../reference/graph_search.js
 // and the `line` field yielded by aStarSteps.ts, line for line.
+//
+// This is the *animation-only* wording (used by PseudocodePanel inside
+// AStarPanel): line 11's phrasing is simplified and line 12's inline
+// comment is dropped to fit the panel's small footprint. The static
+// "Algorithmic process" slide in slides.md keeps the original, fuller
+// wording rather than importing this file.
 export const astarPseudocode: string[] = [
   'initialize the open queue with the start node (distance 0)',
   'while the open queue is not empty',
@@ -11,8 +17,8 @@ export const astarPseudocode: string[] = [
   '        if the neighbor is off-grid or in collision, skip it',
   '        tentative_distance = current.distance + eps',
   '        if tentative_distance < neighbor.distance',
-  '            record this cheaper path: neighbor.distance, neighbor.parent',
-  '            neighbor.priority = f(neighbor)   // g + h for A-star',
+  '            update routing through visited cell',
+  '            neighbor.priority = f(neighbor)',
   '            insert the neighbor into the open queue',
   'the open queue emptied out -- no path exists; fail',
 ]

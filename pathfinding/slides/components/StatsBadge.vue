@@ -2,16 +2,18 @@
 withDefaults(
   defineProps<{
     visited: number
+    queued?: number | null
     pathLength?: number | null
     status?: 'idle' | 'iterating' | 'succeeded' | 'failed'
   }>(),
-  { pathLength: null, status: undefined },
+  { queued: null, pathLength: null, status: undefined },
 )
 </script>
 
 <template>
   <div class="stats">
     <span class="stat">visited <b>{{ visited }}</b></span>
+    <span v-if="queued !== null" class="stat">queued <b>{{ queued }}</b></span>
     <span v-if="pathLength !== null" class="stat">path length <b>{{ pathLength.toFixed(2) }}</b></span>
     <span v-if="status" class="status" :class="status">{{ status }}</span>
   </div>

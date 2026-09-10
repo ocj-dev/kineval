@@ -8,24 +8,25 @@ import MapCanvas from './MapCanvas.vue'
 import AStarControls from './AStarControls.vue'
 import PseudocodePanel from './PseudocodePanel.vue'
 import StatsBadge from './StatsBadge.vue'
+import HeapBlocks from './HeapBlocks.vue'
 
 const props = withDefaults(
   defineProps<{
     initialScene?: string
     initialAlg?: SearchAlg
-    eps?: number
     speedMs?: number
     showPseudocode?: boolean
     showAlgPicker?: boolean
+    showScenePicker?: boolean
     compact?: boolean
   }>(),
   {
     initialScene: 'misc',
     initialAlg: 'A-star',
-    eps: 0.2,
-    speedMs: 12,
+    speedMs: 4,
     showPseudocode: true,
     showAlgPicker: true,
+    showScenePicker: true,
     compact: false,
   },
 )
@@ -38,7 +39,7 @@ const speed = ref(props.speedMs)
 const tracer = useAStarTracer(speed)
 
 function reload() {
-  tracer.load(scene.value, searchAlg.value, props.eps)
+  tracer.load(scene.value, searchAlg.value)
 }
 
 onMounted(reload)
@@ -70,6 +71,7 @@ const pathLength = computed(() => {
           :scene-id="sceneId"
           :search-alg="searchAlg"
           :show-alg-picker="showAlgPicker"
+          :show-scene-picker="showScenePicker"
           :compact="compact"
           @play="tracer.play"
           @pause="tracer.pause"
@@ -79,19 +81,29 @@ const pathLength = computed(() => {
           @update:scene-id="sceneId = $event"
           @update:search-alg="searchAlg = $event"
         />
-        <StatsBadge :visited="tracer.visitedCount.value" :path-length="pathLength" :status="tracer.status.value" />
+        <StatsBadge
+          :visited="tracer.visitedCount.value"
+          :queued="tracer.queuedCount.value"
+          :path-length="pathLength"
+          :status="tracer.status.value"
+        />
       </div>
-      <div class="scene-note">{{ scene.description }}</div>
+      <div class="heap-wrap">
+        <HeapBlocks :heap="tracer.heap.value" />
+      </div>
     </div>
 
     <div class="stage-right panel">
       <MapCanvas
         :scene="scene"
-        :eps="props.eps"
         :visited="tracer.visited.value"
         :queued="tracer.queued.value"
+        :distances="tracer.distances.value"
+        :edges="tracer.edges.value"
         :path="tracer.path.value"
         :current-node="tracer.currentNode.value"
+        :neighbor-node="tracer.neighborNode.value"
+        :neighbor-priority="tracer.neighborPriority.value"
       />
     </div>
   </div>
@@ -129,14 +141,8 @@ const pathLength = computed(() => {
   flex-direction: column;
   gap: 0.35em;
 }
-.scene-note {
+.heap-wrap {
   flex: 0 0 auto;
-  font-size: 0.6em;
-  line-height: 1.3;
-  color: #5f6368;
   padding: 0.1em 0.1em;
-}
-.stage.compact .scene-note {
-  display: none;
 }
 </style>
