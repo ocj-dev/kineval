@@ -29,7 +29,7 @@ jobs:
       - name: Build the pathfinding Slidev deck
         working-directory: pathfinding/slides
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Assemble the site
