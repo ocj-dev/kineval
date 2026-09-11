@@ -50,13 +50,23 @@ function buildTrace(scene: Scene, alg: SearchAlg): TraceEntry[] {
   return trace
 }
 
+// Pseudocode lines 7-13 are the "for each neighbor" inner loop -- when
+// skipQueueing is on, stepping jumps straight over every step in this
+// range, landing on the next outer-loop line (2-6 or 14) as if the whole
+// neighbor-examination pass were a single step.
+const INNER_LOOP_MIN = 7
+const INNER_LOOP_MAX = 13
+function isInnerLoopLine(line: number): boolean {
+  return line >= INNER_LOOP_MIN && line <= INNER_LOOP_MAX
+}
+
 // Every scene/algorithm combination is precomputed into a full trace, so
 // Play/Pause/Step Forward/Step Back/Reset are all just index navigation over
 // an array that already exists -- mirrors useSorter.ts's approach in the
 // sortingthespiderverse deck. Every pseudocode line gets its own trace
 // entry (see aStarSteps.ts), so stepping one entry at a time walks the
 // pseudocode one line at a time.
-export function useAStarTracer(speedMs: Ref<number> = ref(4)) {
+export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<boolean> = ref(false)) {
   const activeLine = ref(-1)
   const visited = ref<Set<string>>(new Set())
   const queued = ref<Set<string>>(new Set())
@@ -131,13 +141,21 @@ export function useAStarTracer(speedMs: Ref<number> = ref(4)) {
 
   function stepForward(): boolean {
     if (pos.value >= trace.length - 1) return false
-    applyPos(pos.value + 1)
+    let next = pos.value + 1
+    if (skipQueueing.value) {
+      while (next < trace.length - 1 && isInnerLoopLine(trace[next].step.line)) next++
+    }
+    applyPos(next)
     return pos.value < trace.length - 1
   }
 
   function stepBack() {
     if (pos.value <= -1) return
-    applyPos(pos.value - 1)
+    let prev = pos.value - 1
+    if (skipQueueing.value) {
+      while (prev > -1 && isInnerLoopLine(trace[prev].step.line)) prev--
+    }
+    applyPos(prev)
   }
 
   function scheduleNext() {

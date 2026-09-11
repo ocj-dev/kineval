@@ -109,9 +109,14 @@ function iterateGraphSearch() {
 
     // #region main-loop
     // pseudocode line 2: search fails once the open queue is exhausted
-    //   without having reached the goal
-    if (visit_queue.length === 0)
+    //   without having reached the goal. Stop the animate() loop from
+    //   calling this function again (see infrastructure.js/draw.js) --
+    //   without this, the search would keep iterating (and finding
+    //   nothing, since the queue stays empty) forever.
+    if (visit_queue.length === 0) {
+        search_iterate = false;
         return "failed";
+    }
 
     // pseudocode line 3: pop the node with minimum priority from the open
     //   queue (lazy deletion: a node may be enqueued more than once if its
@@ -135,6 +140,10 @@ function iterateGraphSearch() {
     var dist_to_goal = Math.sqrt(Math.pow(current_node.x-q_goal[0],2)+Math.pow(current_node.y-q_goal[1],2));
     if (dist_to_goal <= eps) {
         drawHighlightedPathGraph(current_node);
+        // stop iterating -- the path is found, so further calls to this
+        // function (from the animate() loop) would otherwise keep
+        // expanding nodes well past the point the search is done.
+        search_iterate = false;
         return "succeeded";
     }
     // #endregion main-loop

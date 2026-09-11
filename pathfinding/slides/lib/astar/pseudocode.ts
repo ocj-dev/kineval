@@ -12,7 +12,7 @@ export const astarPseudocode: string[] = [
   '    pop the node with minimum priority from the open queue',
   '    if that node was already visited, discard it and continue',
   '    mark the node visited',
-  '    if within one grid cell of the goal, reconstruct path and succeed',
+  '    if within one grid cell of the goal, reconstruct path, stop, and succeed',
   '    for each of its 4 grid neighbors',
   '        if the neighbor is off-grid or in collision, skip it',
   '        tentative_distance = current.distance + eps',
@@ -20,5 +20,5 @@ export const astarPseudocode: string[] = [
   '            update routing through visited cell',
   '            neighbor.priority = f(neighbor)',
   '            insert the neighbor into the open queue',
-  'the open queue emptied out -- no path exists; fail',
+  'the open queue emptied out -- stop; no path exists; fail',
 ]

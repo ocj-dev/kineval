@@ -2,6 +2,7 @@
 theme: default
 title: A-star Path Planning — KinEval Lab
 base: /kineval/pathfinding/
+colorSchema: light
 info: |
   ## A-star Path Planning
   A KinEval lab-session walkthrough of A-star graph search, built for the AutoRob course (autorob.org).
@@ -27,7 +28,7 @@ fonts:
 
 <div class="title-footer">
 <div class="nav-hint">Press → to move forward through the deck</div>
-<div class="credit">AutoRob (autorob.org) &#183; ocj-dev.github.io/kineval/pathfinding</div>
+<div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding</div>
 </div>
 
 <!--
@@ -140,7 +141,7 @@ admissible heuristic is exactly what guarantees A-star still finds the *shortest
  3      pop the node with minimum priority from the open queue
  4      if that node was already visited, discard it and continue
  5      mark the node visited
- 6      if within one grid cell of the goal, reconstruct path and succeed
+ 6      if within one grid cell of the goal, reconstruct path, stop, and succeed
  7      for each of its 4 grid neighbors
  8          if the neighbor is off-grid or in collision, skip it
  9          tentative_distance = current.distance + eps
@@ -148,7 +149,7 @@ admissible heuristic is exactly what guarantees A-star still finds the *shortest
 11              record this cheaper path: neighbor.distance, neighbor.parent
 12              neighbor.priority = f(neighbor)   // g + h for A-star
 13              insert the neighbor into the open queue
-14  the open queue emptied out -- no path exists; fail
+14  the open queue emptied out -- stop; no path exists; fail
 ```
 
 </div>
@@ -197,7 +198,7 @@ search reconstruct a route at the end), <code>visited</code> (finalized, never r
 <code>priority</code> (what the open-queue heap sorts on).
 </div>
 
-<<< ../reference/graph_search.js#grid-node-fields {*}{lines:true,startLine:61}
+<<< ../reference/graph_search.js#grid-node-fields {*}{lines:true,startLine:61,maxHeight:'420px'}
 
 ---
 layout: default
@@ -295,7 +296,7 @@ end, then "sifts down" the new root by repeatedly swapping with its smaller chil
 heap invariant is restored — O(log n).
 </div>
 
-<<< ../reference/graph_search.js#pop-min {*}{lines:true,startLine:241}
+<<< ../reference/graph_search.js#pop-min {*}{lines:true,startLine:250,maxHeight:'420px'}
 
 ---
 layout: default
@@ -310,7 +311,7 @@ cheaper path to it is found later; the main loop's stale-entry check (line 4) di
 leftover duplicate lazily when it is eventually popped.
 </div>
 
-<<< ../reference/graph_search.js#insert-queue {*}{lines:true,startLine:222}
+<<< ../reference/graph_search.js#insert-queue {*}{lines:true,startLine:231,maxHeight:'420px'}
 
 ---
 layout: default
@@ -324,7 +325,7 @@ tracks the single closest grid node while building the grid, then queues that no
 distance — the seed the entire search grows from.
 </div>
 
-<<< ../reference/graph_search.js#init-start {*}{lines:true,startLine:83}
+<<< ../reference/graph_search.js#init-start {*}{lines:true,startLine:83,maxHeight:'420px'}
 
 ---
 layout: default
@@ -338,7 +339,7 @@ loop into greedy-best-first, breadth-first, or a depth-first emulation — the r
 implementation supports all four via the <code>search_alg</code> switch.
 </div>
 
-<<< ../reference/graph_search.js#priority-formula {*}{lines:true,startLine:191}
+<<< ../reference/graph_search.js#priority-formula {*}{lines:true,startLine:200,maxHeight:'420px'}
 
 ---
 layout: default
@@ -350,10 +351,13 @@ layout: default
 Each call to <code>iterateGraphSearch()</code> performs <i>one</i> queue-pop-and-visit step, then
 returns control to the browser's animation loop — an explicit <code>while</code> loop here would
 block the page. This per-call structure is exactly what makes Play/Pause/Step possible in this
-deck's visualizations: one call is one step.
+deck's visualizations: one call is one step. Both terminal cases set
+<code>search_iterate = false</code> before returning, so the animation loop stops calling this
+function the moment the search succeeds or fails, instead of keeping the search running well
+past the point it found (or ruled out) a path.
 </div>
 
-<<< ../reference/graph_search.js#main-loop {*}{lines:true,startLine:111}
+<<< ../reference/graph_search.js#main-loop {*}{lines:true,startLine:111,maxHeight:'420px'}
 
 ---
 layout: default
@@ -367,7 +371,7 @@ of stepping there, and <i>relax</i> the edge — update the neighbor's distance/
 (re)queue it — only if this path to it is cheaper than any found before.
 </div>
 
-<<< ../reference/graph_search.js#neighbor-loop {*}{lines:true,startLine:143}
+<<< ../reference/graph_search.js#neighbor-loop {*}{lines:true,startLine:152,maxHeight:'420px'}
 
 ---
 layout: default
@@ -378,10 +382,10 @@ layout: default
 <div class="panel text-xs mt-2">
 Once the goal is reached, the path is just the chain of <code>parent</code> pointers back to the
 start — walked once here to draw it, exactly the same chain this deck's visualizations walk to
-render their blue route line and bold parent-edge tree.
+render their red route line (the search tree of all explored parent edges stays blue).
 </div>
 
-<<< ../reference/draw.js#path-reconstruct {*}{lines:true,startLine:64}
+<<< ../reference/draw.js#path-reconstruct {*}{lines:true,startLine:64,maxHeight:'420px'}
 
 ---
 layout: default
@@ -451,26 +455,36 @@ layout: default
 
 # Try this yourself
 
-<div class="panel text-sm mt-2">
+<div class="split-panel">
+<div class="side-image">
+<img src="/images/kineval-narrow2.jpg" alt="KinEval search canvas interface showing a completed A-star path through the narrow2 scene" />
+</div>
+<div class="panel text-xs">
 
 The reference implementation runs standalone, no build step, straight from `search_canvas.html`.
 Every run is configured entirely through URL parameters:
 
-| Parameter | Values | Meaning |
-|---|---|---|
-| `search_alg` | `A-star`, `greedy-best-first`, `breadth-first`, `depth-first` | which priority formula drives the search |
-| `planning_scene` | a built-in name, or a path like `scenes/spiral.js` | which obstacle layout to load |
-| `q_init` | `[x,y]` | start location |
-| `q_goal` | `[x,y]` | goal location |
-| `eps` | a number | grid spacing (smaller = finer, slower) |
-| `color_scheme` | `default`, `light`, `blue` | canvas color palette |
+| Parameter | Values |
+|---|---|
+| `search_alg` | `A-star`, `greedy-best-first`, `breadth-first`, `depth-first`<br><span class="meaning">which priority formula drives the search</span> |
+| `planning_scene` | a built-in name, or a path like `scenes/spiral.js`<br><span class="meaning">which obstacle layout to load</span> |
+| `q_init` | `[x,y]`<br><span class="meaning">start location</span> |
+| `q_goal` | `[x,y]`<br><span class="meaning">goal location</span> |
+| `eps` | a number<br><span class="meaning">grid spacing (smaller = finer, slower)</span> |
+| `color_scheme` | `default`, `light`, `blue`<br><span class="meaning">canvas color palette</span> |
 
 ```text
-search_canvas.html?search_alg=A-star?planning_scene=scenes/spiral.js?q_init=[0,0]?q_goal=[4,4]?eps=0.2
+search_canvas.html
+  ?search_alg=A-star
+  ?planning_scene=scenes/spiral.js
+  ?q_init=[0,0]?q_goal=[4,4]?eps=0.2
 ```
 
 **Run it live:** [ocj-dev.github.io/kineval/kineval/pathplanning](https://ocj-dev.github.io/kineval/kineval/pathplanning/)
 
+**Previous version (Winter 2023):** [autorob.org/archive/assignment-1-path-planning](https://autorob.org/archive/assignment-1-path-planning/)
+
+</div>
 </div>
 
 ---
@@ -482,6 +496,7 @@ class: text-center
 <a href="https://robots.engin.umich.edu/Projects/NGV" target="_blank" class="side-image" style="display:inline-block;max-height:76%;">
 <img src="/images/ford-fusion-ngv.jpg" class="hero-image" alt="A Ford Fusion Next Generation Vehicle autonomous research car" />
 </a>
-<div class="image-caption">Go Blue!</div>
 <div class="image-credit">Ford Fusion Next Generation Vehicle &#183; <a href="https://robots.engin.umich.edu/Projects/NGV">robots.engin.umich.edu/Projects/NGV</a></div>
+<div class="image-caption">Go Blue!</div>
+<div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding</div>
 </div>

@@ -34,9 +34,11 @@ const props = withDefaults(
 const sceneId = ref(props.initialScene)
 const searchAlg = ref<SearchAlg>(props.initialAlg)
 const scene = computed(() => sceneById(sceneId.value))
+const showRouting = ref(true)
+const skipQueueing = ref(false)
 
 const speed = ref(props.speedMs)
-const tracer = useAStarTracer(speed)
+const tracer = useAStarTracer(speed, skipQueueing)
 
 function reload() {
   tracer.load(scene.value, searchAlg.value)
@@ -70,6 +72,8 @@ const pathLength = computed(() => {
           :is-at-start="tracer.isAtStart.value"
           :scene-id="sceneId"
           :search-alg="searchAlg"
+          :show-routing="showRouting"
+          :skip-queueing="skipQueueing"
           :show-alg-picker="showAlgPicker"
           :show-scene-picker="showScenePicker"
           :compact="compact"
@@ -80,6 +84,8 @@ const pathLength = computed(() => {
           @step-back="tracer.stepBack"
           @update:scene-id="sceneId = $event"
           @update:search-alg="searchAlg = $event"
+          @update:show-routing="showRouting = $event"
+          @update:skip-queueing="skipQueueing = $event"
         />
         <StatsBadge
           :visited="tracer.visitedCount.value"
@@ -104,6 +110,7 @@ const pathLength = computed(() => {
         :current-node="tracer.currentNode.value"
         :neighbor-node="tracer.neighborNode.value"
         :neighbor-priority="tracer.neighborPriority.value"
+        :show-routing="showRouting"
       />
     </div>
   </div>

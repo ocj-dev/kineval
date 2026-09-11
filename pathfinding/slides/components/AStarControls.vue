@@ -9,6 +9,8 @@ withDefaults(
     isAtStart?: boolean
     sceneId: string
     searchAlg: SearchAlg
+    showRouting: boolean
+    skipQueueing: boolean
     showAlgPicker?: boolean
     showScenePicker?: boolean
     compact?: boolean
@@ -24,6 +26,8 @@ const emit = defineEmits<{
   stepBack: []
   'update:sceneId': [string]
   'update:searchAlg': [SearchAlg]
+  'update:showRouting': [boolean]
+  'update:skipQueueing': [boolean]
 }>()
 
 const algOptions: { id: SearchAlg; label: string }[] = [
@@ -50,11 +54,25 @@ const algOptions: { id: SearchAlg; label: string }[] = [
           <option v-for="s in scenes" :key="s.id" :value="s.id">{{ s.name }}{{ s.isNew ? ' (new)' : '' }}</option>
         </select>
       </label>
+      <label v-if="showScenePicker" class="checkbox-picker">
+        <input
+          type="checkbox" :checked="showRouting"
+          @change="emit('update:showRouting', ($event.target as HTMLInputElement).checked)"
+        />
+        Routing
+      </label>
       <label v-if="showAlgPicker" class="picker">
         <span>Algorithm</span>
         <select :value="searchAlg" @change="emit('update:searchAlg', ($event.target as HTMLSelectElement).value as SearchAlg)">
           <option v-for="a in algOptions" :key="a.id" :value="a.id">{{ a.label }}</option>
         </select>
+      </label>
+      <label v-if="showAlgPicker" class="checkbox-picker">
+        <input
+          type="checkbox" :checked="skipQueueing"
+          @change="emit('update:skipQueueing', ($event.target as HTMLInputElement).checked)"
+        />
+        Skip Queueing
       </label>
     </div>
   </div>
@@ -89,11 +107,25 @@ const algOptions: { id: SearchAlg; label: string }[] = [
   background: #fff;
   color: var(--ink, #202124);
 }
+.checkbox-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72em;
+  color: #5f6368;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.checkbox-picker input {
+  cursor: pointer;
+}
 .astar-controls.compact .btn-maps {
   font-size: 0.7em;
   padding: 0.4em 0.7em;
 }
-.astar-controls.compact .picker {
+.astar-controls.compact .picker,
+.astar-controls.compact .checkbox-picker {
   font-size: 0.62em;
 }
 </style>

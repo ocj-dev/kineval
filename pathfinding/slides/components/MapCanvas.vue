@@ -14,6 +14,7 @@ const props = withDefaults(
     currentNode?: { x: number; y: number } | null
     neighborNode?: { x: number; y: number } | null
     neighborPriority?: number | null
+    showRouting?: boolean
   }>(),
   {
     visited: () => new Set(),
@@ -24,6 +25,7 @@ const props = withDefaults(
     currentNode: null,
     neighborNode: null,
     neighborPriority: null,
+    showRouting: true,
   },
 )
 
@@ -162,7 +164,7 @@ const finalRouteLine = computed(() => {
       <span class="swatch queued" /> Queued
     </div>
     <div class="map-wrap" :class="{ 'scene-teaching': scene.isTeachingExample }">
-      <div v-if="neighborPriority !== null" class="fscore-label">f = {{ neighborPriority.toFixed(1) }}</div>
+      <div v-if="showRouting && neighborPriority !== null" class="fscore-label">f = {{ neighborPriority.toFixed(1) }}</div>
       <div class="map-grid" :style="{ gridTemplateColumns: `repeat(${numCols}, 1fr)` }">
         <template v-for="row in cells" :key="row[0]?.y">
           <div
@@ -177,7 +179,7 @@ const finalRouteLine = computed(() => {
           </div>
         </template>
       </div>
-      <svg class="edge-overlay" :viewBox="`0 0 ${numCols} ${numRows}`" preserveAspectRatio="none">
+      <svg v-if="showRouting" class="edge-overlay" :viewBox="`0 0 ${numCols} ${numRows}`" preserveAspectRatio="none">
         <line
           v-for="(e, i) in treeEdges" :key="'edge' + i"
           :x1="e.x1" :y1="e.y1" :x2="e.x2" :y2="e.y2"
@@ -262,6 +264,8 @@ const finalRouteLine = computed(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  /* routing lines always render above every cell/pin in the grid */
+  z-index: 10;
 }
 .tree-edge {
   stroke: var(--gmaps-blue-dark, #174ea6);
@@ -270,7 +274,7 @@ const finalRouteLine = computed(() => {
 }
 .final-route-line {
   fill: none;
-  stroke: var(--gmaps-blue, #1a73e8);
+  stroke: var(--gmaps-red, #ea4335);
   stroke-width: 0.16;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -307,8 +311,13 @@ const finalRouteLine = computed(() => {
 .cell.queued {
   background: var(--queued, #fef3c4);
 }
+.cell.path.visited,
+.cell.path.queued,
 .cell.path {
-  background: var(--gmaps-blue, #1a73e8);
+  /* deliberately higher specificity than .cell.visited/.cell.queued alone
+     (a path cell is necessarily also visited) so the final route always
+     shows red regardless of stylesheet rule order */
+  background: var(--gmaps-red, #ea4335);
 }
 .cell.current {
   box-shadow: inset 0 0 0 2px var(--gmaps-red, #ea4335);
