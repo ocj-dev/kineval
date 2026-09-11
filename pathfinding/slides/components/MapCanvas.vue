@@ -60,6 +60,10 @@ function cellCenter(x: number, y: number) {
   return { cx: col + 0.5, cy: row + 0.5 }
 }
 
+function pointsAttr(points: { x: number; y: number }[]): string {
+  return points.map((p) => { const c = cellCenter(p.x, p.y); return `${c.cx},${c.cy}` }).join(' ')
+}
+
 const pathKeys = computed(() => new Set(props.path.map((p) => nodeKey(p.x, p.y))))
 
 function cellClass(cell: { x: number; y: number; obstacle: boolean }) {
@@ -71,10 +75,13 @@ function cellClass(cell: { x: number; y: number; obstacle: boolean }) {
     path: !cell.obstacle && pathKeys.value.has(k),
     current: !cell.obstacle && props.currentNode
       && nodeKey(props.currentNode.x, props.currentNode.y) === k,
+    neighbor: !cell.obstacle && props.neighborNode
+      && nodeKey(props.neighborNode.x, props.neighborNode.y) === k,
   }
 }
 
 function cellDistanceText(cell: { x: number; y: number; obstacle: boolean }): string {
+  if (!props.scene.isTeachingExample) return ''
   if (cell.obstacle) return ''
   const k = nodeKey(cell.x, cell.y)
   if (!props.visited.has(k) && !props.queued.has(k)) return ''
@@ -100,13 +107,49 @@ const treeEdges = computed(() => {
   return lines
 })
 
-// Transient line from a just-enqueued neighbor to the goal, labeled with
-// its f-score -- only shown for the step that enqueues it.
-const goalLine = computed(() => {
-  if (!props.neighborNode) return null
-  const from = cellCenter(props.neighborNode.x, props.neighborNode.y)
-  const to = cellCenter(props.scene.qGoal[0], props.scene.qGoal[1])
-  return { x1: from.cx, y1: from.cy, x2: to.cx, y2: to.cy, mx: (from.cx + to.cx) / 2, my: (from.cy + to.cy) / 2 }
+// Walks the recorded parent chain from (x,y) back to the start node,
+// using the same edges map the persistent search tree is drawn from.
+// Returns points ordered [start, ..., (x,y)].
+function routeToStart(x: number, y: number): { x: number; y: number }[] {
+  const points: { x: number; y: number }[] = [{ x, y }]
+  let key = nodeKey(x, y)
+  let guard = 0
+  while (props.edges.has(key) && guard < 10000) {
+    const parentKey = props.edges.get(key)!
+    const [px, py] = parentKey.split(',').map(Number)
+    points.push({ x: px, y: py })
+    key = parentKey
+    guard++
+  }
+  return points.reverse()
+}
+
+// The tentative route "through" the neighbor currently being enqueued:
+// the actual (solid) path back to the start via the current node, plus the
+// (dashed) straight-line heuristic estimate from the neighbor to the goal.
+// Only shown once the neighbor's f-score has actually been computed
+// (lines 12-13), not merely while it's being considered (lines 7-10).
+const tentativeRoute = computed(() => {
+  if (!props.neighborNode || props.neighborPriority === null || !props.currentNode) return null
+  const solidPoints = [...routeToStart(props.currentNode.x, props.currentNode.y), props.neighborNode]
+  return {
+    solid: pointsAttr(solidPoints),
+    dashed: `${pointsAttr([props.neighborNode])} ${pointsAttr([{ x: props.scene.qGoal[0], y: props.scene.qGoal[1] }])}`,
+  }
+})
+
+// The final route once the search succeeds, extended with explicit
+// segments to the exact start/goal coordinates so it always visually
+// reaches both pins even when the nearest visited node isn't exactly on
+// top of them.
+const finalRouteLine = computed(() => {
+  if (props.path.length === 0) return null
+  const points = [
+    { x: props.scene.qGoal[0], y: props.scene.qGoal[1] },
+    ...props.path,
+    { x: props.scene.qInit[0], y: props.scene.qInit[1] },
+  ]
+  return pointsAttr(points)
 })
 </script>
 
@@ -118,7 +161,8 @@ const goalLine = computed(() => {
       <span class="swatch visited" /> Visited
       <span class="swatch queued" /> Queued
     </div>
-    <div class="map-wrap">
+    <div class="map-wrap" :class="{ 'scene-teaching': scene.isTeachingExample }">
+      <div v-if="neighborPriority !== null" class="fscore-label">f = {{ neighborPriority.toFixed(1) }}</div>
       <div class="map-grid" :style="{ gridTemplateColumns: `repeat(${numCols}, 1fr)` }">
         <template v-for="row in cells" :key="row[0]?.y">
           <div
@@ -139,12 +183,10 @@ const goalLine = computed(() => {
           :x1="e.x1" :y1="e.y1" :x2="e.x2" :y2="e.y2"
           class="tree-edge"
         />
-        <g v-if="goalLine">
-          <line :x1="goalLine.x1" :y1="goalLine.y1" :x2="goalLine.x2" :y2="goalLine.y2" class="goal-line" />
-          <rect :x="goalLine.mx - 0.32" :y="goalLine.my - 0.11" width="0.64" height="0.22" rx="0.05" class="goal-line-label-bg" />
-          <text :x="goalLine.mx" :y="goalLine.my" class="goal-line-label" text-anchor="middle" dominant-baseline="middle">
-            {{ neighborPriority?.toFixed(1) }}
-          </text>
+        <polyline v-if="finalRouteLine" :points="finalRouteLine" class="final-route-line" />
+        <g v-if="tentativeRoute">
+          <polyline :points="tentativeRoute.solid" class="route-solid" />
+          <polyline :points="tentativeRoute.dashed" class="route-dashed" />
         </g>
       </svg>
     </div>
@@ -193,6 +235,20 @@ const goalLine = computed(() => {
   overflow: hidden;
   box-shadow: 0 1px 2px #00000026, 0 1px 3px 1px #00000014;
 }
+.fscore-label {
+  position: absolute;
+  top: 0.5em;
+  left: 0.5em;
+  z-index: 4;
+  background: #fffffff0;
+  border: 1px solid var(--gmaps-red, #ea4335);
+  color: var(--gmaps-red, #ea4335);
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  font-size: 0.65em;
+  padding: 0.15em 0.5em;
+  border-radius: 6px;
+}
 .map-grid {
   display: grid;
   grid-auto-rows: 1fr;
@@ -212,25 +268,30 @@ const goalLine = computed(() => {
   stroke-width: 0.12;
   stroke-linecap: round;
 }
-.goal-line {
+.final-route-line {
+  fill: none;
+  stroke: var(--gmaps-blue, #1a73e8);
+  stroke-width: 0.16;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.route-solid {
+  fill: none;
+  stroke: var(--gmaps-red, #ea4335);
+  stroke-width: 0.08;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.route-dashed {
+  fill: none;
   stroke: var(--gmaps-red, #ea4335);
   stroke-width: 0.08;
   stroke-dasharray: 0.12 0.1;
 }
-.goal-line-label-bg {
-  fill: #fff;
-  opacity: 0.9;
-}
-.goal-line-label {
-  font-size: 0.16px;
-  font-family: var(--font-mono, monospace);
-  fill: var(--gmaps-red, #ea4335);
-  font-weight: 700;
-}
 .cell {
   position: relative;
   background: var(--road, #fff);
-  outline: 0.5px solid #00000008;
+  outline: 0.5px solid #00000030;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -253,6 +314,10 @@ const goalLine = computed(() => {
   box-shadow: inset 0 0 0 2px var(--gmaps-red, #ea4335);
   z-index: 2;
 }
+.cell.neighbor {
+  box-shadow: inset 0 0 0 2px var(--gmaps-purple, #a142f4);
+  z-index: 2;
+}
 .cell-distance {
   font-size: 0.42em;
   font-family: var(--font-mono, monospace);
@@ -260,6 +325,12 @@ const goalLine = computed(() => {
   opacity: 0.75;
   pointer-events: none;
   white-space: nowrap;
+}
+.scene-teaching .cell-distance {
+  position: absolute;
+  left: 0.15em;
+  bottom: 0.05em;
+  font-size: 1.05em;
 }
 .pin {
   font-family: var(--font-display, 'Roboto', sans-serif);

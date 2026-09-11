@@ -6,20 +6,22 @@ const props = defineProps<{
   heap: HeapEntry[]
 }>()
 
-const shown = computed(() => props.heap.slice(0, 7))
-const overflow = computed(() => Math.max(0, props.heap.length - 7))
+const shown = computed(() => props.heap.slice(0, 3))
+const overflow = computed(() => Math.max(0, props.heap.length - 3))
 </script>
 
 <template>
   <div class="heap-blocks">
-    <div class="heap-title">Open queue (heap array, first 7 of {{ heap.length }})</div>
-    <div class="blocks">
-      <div v-for="(entry, idx) in shown" :key="idx" class="block" :class="{ root: idx === 0 }">
-        <div class="idx">[{{ entry.i }},{{ entry.j }}]</div>
-        <div class="f">f={{ entry.priority.toFixed(1) }}</div>
+    <div class="heap-title">Open queue (heap array, first 3 of {{ heap.length }})</div>
+    <div class="blocks-box">
+      <div class="blocks">
+        <div v-for="(entry, idx) in shown" :key="idx" class="block" :class="{ root: idx === 0 }">
+          <div class="idx">[{{ entry.i }},{{ entry.j }}]</div>
+          <div class="f">f={{ entry.priority.toFixed(1) }}</div>
+        </div>
+        <div v-if="overflow > 0" class="block more">+{{ overflow }}</div>
+        <div v-if="heap.length === 0" class="empty">empty</div>
       </div>
-      <div v-if="overflow > 0" class="block more">+{{ overflow }}</div>
-      <div v-if="heap.length === 0" class="empty">empty</div>
     </div>
   </div>
 </template>
@@ -32,6 +34,12 @@ const overflow = computed(() => Math.max(0, props.heap.length - 7))
   font-family: var(--font-mono, monospace);
   color: #5f6368;
   margin-bottom: 0.3em;
+}
+.blocks-box {
+  border: 1.5px solid #dadce0;
+  border-radius: 8px;
+  padding: 0.4em;
+  display: inline-block;
 }
 .blocks {
   display: flex;

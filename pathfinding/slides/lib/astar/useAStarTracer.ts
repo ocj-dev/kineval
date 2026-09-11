@@ -104,8 +104,13 @@ export function useAStarTracer(speedMs: Ref<number> = ref(4)) {
     edges.value = entry.edges
     path.value = entry.path
     currentNode.value = entry.step.current ?? null
-    neighborNode.value = entry.step.action === 'enqueue' ? entry.step.neighbor ?? null : null
-    neighborPriority.value = entry.step.action === 'enqueue' ? entry.step.neighborPriority ?? null : null
+    // neighborNode covers the whole lines 7-13 span for a given neighbor
+    // (every step in that span carries a `neighbor`), so the neighbor cell
+    // stays highlighted throughout its consideration; neighborPriority is
+    // only set once it's actually computed (lines 12-13), which gates the
+    // full tentative-route line drawn back to start and out to the goal.
+    neighborNode.value = entry.step.neighbor ?? null
+    neighborPriority.value = entry.step.neighborPriority ?? null
     heap.value = entry.step.heap
     if (entry.step.action === 'succeed') status.value = 'succeeded'
     else if (entry.step.action === 'fail') status.value = 'failed'

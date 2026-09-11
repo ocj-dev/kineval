@@ -190,6 +190,7 @@ export const miniGridScene: Scene = {
   isNew: false,
   gridBounds: { xMin: 0, xMax: 3, yMin: 0, yMax: 4, eps: 1 },
   renderBounds: { xMin: 0, xMax: 3, yMin: 0, yMax: 4 },
+  isTeachingExample: true,
 }
 
 export function sceneById(id: string): Scene {

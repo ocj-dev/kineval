@@ -81,4 +81,6 @@ export interface Scene {
    * should render at their exact extent instead.
    */
   renderBounds?: { xMin: number; xMax: number; yMin: number; yMax: number }
+  /** True only for the small hand-worked example grid (see miniGridScene). */
+  isTeachingExample?: boolean
 }
