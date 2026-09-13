@@ -111,7 +111,7 @@ original use case — turn-by-turn directions across town.
 layout: default
 ---
 
-# KinEval Path Planning Stencil <a class="accent" href="https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/narrow2.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1" target="_blank">(link)</a>
+# KinEval Path Planning Stencil <a class="accent" href="https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=narrow2?q_init=[0,0]?q_goal=[4,4]?eps=0.1" target="_blank">(link)</a>
 
 <div class="split-panel">
 <div class="side-image">
@@ -134,11 +134,11 @@ Every run is configured entirely through URL parameters:
 ```text
 search_canvas.html
   ?search_alg=A-star
-  ?planning_scene=scenes/narrow2.js
+  ?planning_scene=narrow2
   ?q_init=[0,0]?q_goal=[4,4]?eps=0.1
 ```
 
-**Run it live:** [ocj-dev.github.io/kineval/kineval/pathplanning](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/narrow2.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1)
+**Run it live:** [ocj-dev.github.io/kineval/kineval/pathplanning](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=narrow2?q_init=[0,0]?q_goal=[4,4]?eps=0.1)
 
 **Previous version (Winter 2023):** [autorob.org/archive/assignment-1-path-planning](https://autorob.org/archive/assignment-1-path-planning/)
 
@@ -582,18 +582,18 @@ layout: default
 
 <div class="panel text-xs mt-2">
 
-| Scene | New? | What it tests |
-|---|---|---|
-| Empty | | Baseline: unobstructed Manhattan-distance path length |
-| Misc | | Scattered obstacles with a narrow opening (stencil default) |
-| Narrow 1 | | A single narrow corridor between two large blocks |
-| Narrow 2 | | A staggered pair of corridors, forcing a longer route |
-| Three Sections | | Three compartments connected by alternating passages |
-| Downtown Gridlock | ✅ | A 3x3 grid of blocks — many turns, many equally-short routes |
-| Diagonal Staircase | ✅ | Alternating full-width bands force a genuinely longer detour |
-| Spiral | ✅ | A two-ring spiral corridor from the outside in to a center goal |
-| Cul-de-Sac | ✅ | A dead end lures greedy-best-first into a suboptimal route |
-| Construction Detour | ✅ | A single "road closure" wall, gapped past the goal |
+| Scene | New? | What it tests | Run it |
+|---|---|---|---|
+| Empty | | Baseline: unobstructed Manhattan-distance path length | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=empty?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Misc | | Scattered obstacles with a narrow opening (stencil default) | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=misc?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Narrow 1 | | A single narrow corridor between two large blocks | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=narrow1?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Narrow 2 | | A staggered pair of corridors, forcing a longer route | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=narrow2?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Three Sections | | Three compartments connected by alternating passages | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=three_sections?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Downtown Gridlock | ✅ | A 3x3 grid of blocks — many turns, many equally-short routes | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/downtown_gridlock.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Diagonal Staircase | ✅ | Alternating full-width bands force a genuinely longer detour | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/diagonal_staircase.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Spiral | ✅ | A two-ring spiral corridor from the outside in to a center goal | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/spiral.js?q_init=[-0.65,2]?q_goal=[2,2]?eps=0.1) |
+| Cul-de-Sac | ✅ | A dead end lures greedy-best-first into a suboptimal route | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/cul_de_sac.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
+| Construction Detour | ✅ | A single "road closure" wall, gapped past the goal | [▶](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/construction_detour.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1) |
 
 </div>
 
