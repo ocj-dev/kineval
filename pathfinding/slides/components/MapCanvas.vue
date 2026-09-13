@@ -72,15 +72,12 @@ function pointsAttr(points: { x: number; y: number }[]): string {
   return points.map((p) => { const c = cellCenter(p.x, p.y); return `${c.cx},${c.cy}` }).join(' ')
 }
 
-const pathKeys = computed(() => new Set(props.path.map((p) => nodeKey(p.x, p.y))))
-
 function cellClass(cell: { x: number; y: number; obstacle: boolean }) {
   const k = nodeKey(cell.x, cell.y)
   return {
     obstacle: cell.obstacle,
     visited: !cell.obstacle && props.visited.has(k),
     queued: !cell.obstacle && props.queued.has(k),
-    path: !cell.obstacle && pathKeys.value.has(k),
     current: !cell.obstacle && props.currentNode
       && nodeKey(props.currentNode.x, props.currentNode.y) === k,
     neighbor: !cell.obstacle && props.neighborNode
@@ -332,14 +329,6 @@ const finalRouteLine = computed(() => {
 }
 .cell.queued {
   background: var(--queued, #fef3c4);
-}
-.cell.path.visited,
-.cell.path.queued,
-.cell.path {
-  /* deliberately higher specificity than .cell.visited/.cell.queued alone
-     (a path cell is necessarily also visited) so the final route always
-     shows red regardless of stylesheet rule order */
-  background: var(--gmaps-red, #ea4335);
 }
 .cell.current {
   box-shadow: inset 0 0 0 2px var(--gmaps-red, #ea4335);

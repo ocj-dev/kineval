@@ -185,6 +185,8 @@ admissible heuristic is exactly what guarantees A-star still finds the *shortest
 </div>
 <div class="panel">
 
+**A-Star Pseudocode**
+
 ```text
  0  find the start node for the search from the q_init user parameter
  1  initialize the open queue with the start node (distance 0)
@@ -219,23 +221,21 @@ layout: default
 <div class="panel text-sm mt-4">
 
 The upcoming slides walk the reference implementation
-(`kineval/pathfinding/reference/graph_search.js`) one pseudocode line at a time. **Line 13**
-(inserting into the open queue) comes first, right after the hand-worked grid setup below, since
-it's needed to make sense of the very first step in that example; the remaining components follow
-afterward, in dependency order — the other heap primitive, then the rest of setup, the heuristic,
-the two loop bodies, and finally how the result gets turned into a path:
+(`kineval/pathfinding/reference/graph_search.js`) one pseudocode line at a time, interleaved with
+the conceptual slides on the open queue and the heuristic so each code component appears
+alongside the hand-worked example it supports:
 
-1. **Line 13** — insert a node into the open queue (`minheap_insert`)
-2. **Line 3** — pop the minimum-priority node (`minheap_extract`)
-3. **Line 1** — initialize the open queue with the start node
+1. **Line 1** — initialize the open queue with the start node
+2. **Line 13** — insert a node into the open queue (`minheap_insert`)
+3. **Lines 2–6** — the main loop: pop, discard stale entries, visit, goal test
 4. **Line 12** — the priority formula, `f = g + h`
-5. **Lines 2–6** — the main loop: pop, discard stale entries, visit, goal test
-6. **Lines 7–13** — expanding neighbors: collision checks and edge relaxation
+5. **Lines 7–13** — expanding neighbors: collision checks and edge relaxation
+6. **Line 3** — pop the minimum-priority node (`minheap_extract`)
 7. **Line 6**, revisited — reconstructing the path once the goal is reached
 
 Every snippet is imported directly from the shipped reference file — not retyped — with line
-numbers matching that file exactly. A short appendix after the code walkthrough covers the
-handful of supporting functions none of these slides touch directly.
+numbers matching that file exactly. A short appendix at the end of this deck covers the handful
+of supporting functions none of these slides touch directly.
 
 </div>
 
@@ -284,7 +284,7 @@ search reconstruct a route at the end), <code>visited</code> (finalized, never r
 layout: default
 ---
 
-# Which cell is the start cell?
+# Line 0: Start cell identification
 
 <div class="panel text-xs mt-2">
 <code>q_init</code> generally won't land exactly on a grid point, so <code>initSearchGraph()</code>
@@ -293,6 +293,19 @@ double loop that lays out every cell's fields above also does this bookkeeping a
 </div>
 
 <<< ../reference/graph_search.js#find-start-cell {*}{lines:true,startLine:53,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Line 1: initialize the open queue
+
+<div class="panel text-xs mt-2">
+Once the closest grid node to <code>q_init</code> has been found (line 0), <code>initSearchGraph()</code>
+queues that node with zero distance — the seed the entire search grows from.
+</div>
+
+<<< ../reference/graph_search.js#init-start {*}{lines:true,startLine:87,maxHeight:'420px'}
 
 ---
 layout: default
@@ -326,6 +339,18 @@ and marks it visited (line 5) -- the open-queue block on the left shows the
 heap array shrink from one entry to zero, right before the goal check and
 neighbor expansion begin.
 -->
+
+---
+layout: default
+---
+
+# Lines 2–6: the main loop
+
+<div class="panel text-xs mt-2">
+Each call to <code>iterateGraphSearch()</code> performs <i>one</i> queue-pop-and-visit step for the highest priority node in the <code>visit_queue</code>. Search terminal cases set <code>search_iterate = false</code> before returning when the search succeeds or fails to end further search iterations. Note, an explicit <code>while</code> loop here would block the execution of the web page and prevent drawing and user interface updates. This per-call structure returns control to the browser's animation loop after visiting a node: one call is one search iteration. 
+</div>
+
+<<< ../reference/graph_search.js#main-loop {*}{lines:true,startLine:115,maxHeight:'380px'}
 
 ---
 layout: default
@@ -395,51 +420,6 @@ traveled); only the heuristic estimate of the remaining distance to the goal cha
 layout: default
 ---
 
-# Step through the simple grid
-
-<div class="content-body">
-<AStarPanel initial-scene="simple_3x4" :show-scene-picker="false" :speed-ms="180" />
-</div>
-
-<!--
-The full search to completion on the 12-cell example: watch the open-queue
-heap blocks, the distance labels inside each visited/queued cell, and the
-bold parent-edge tree grow up through the gap in the obstacle row. Toggle
-Manhattan to see the f-score line bend into an L-shape and compare the
-resulting node count.
--->
-
----
-layout: default
----
-
-# Line 3: pop the minimum-priority node
-
-<div class="panel text-xs mt-2">
-<code>minheap_extract</code> swaps the root with the last element, pops the old root off the
-end, then "sifts down" the new root by repeatedly swapping with its smaller child until the
-heap invariant is restored — O(log n).
-</div>
-
-<<< ../reference/graph_search.js#pop-min {*}{lines:true,startLine:254,maxHeight:'420px'}
-
----
-layout: default
----
-
-# Line 1: initialize the open queue
-
-<div class="panel text-xs mt-2">
-Once the closest grid node to <code>q_init</code> has been found (line 0), <code>initSearchGraph()</code>
-queues that node with zero distance — the seed the entire search grows from.
-</div>
-
-<<< ../reference/graph_search.js#init-start {*}{lines:true,startLine:87,maxHeight:'420px'}
-
----
-layout: default
----
-
 # Line 12: the priority formula
 
 <div class="panel text-xs mt-2">
@@ -449,24 +429,6 @@ implementation supports all four via the <code>search_alg</code> switch.
 </div>
 
 <<< ../reference/graph_search.js#priority-formula {*}{lines:true,startLine:204,maxHeight:'420px'}
-
----
-layout: default
----
-
-# Lines 2–6: the main loop
-
-<div class="panel text-xs mt-2">
-Each call to <code>iterateGraphSearch()</code> performs <i>one</i> queue-pop-and-visit step, then
-returns control to the browser's animation loop — an explicit <code>while</code> loop here would
-block the page. This per-call structure is exactly what makes Play/Pause/Step possible in this
-deck's visualizations: one call is one step. Both terminal cases set
-<code>search_iterate = false</code> before returning, so the animation loop stops calling this
-function the moment the search succeeds or fails, instead of keeping the search running well
-past the point it found (or ruled out) a path.
-</div>
-
-<<< ../reference/graph_search.js#main-loop {*}{lines:true,startLine:115,maxHeight:'380px'}
 
 ---
 layout: default
@@ -486,6 +448,38 @@ of stepping there, and <i>relax</i> the edge — update the neighbor's distance/
 layout: default
 ---
 
+# Line 3: pop the minimum-priority node
+
+<div class="panel text-xs mt-2">
+<code>minheap_extract</code> swaps the root with the last element, pops the old root off the
+end, then "sifts down" the new root by repeatedly swapping with its smaller child until the
+heap invariant is restored — O(log n).
+</div>
+
+<<< ../reference/graph_search.js#pop-min {*}{lines:true,startLine:254,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Step through the simple grid
+
+<div class="content-body">
+<AStarPanel initial-scene="simple_3x4" :show-scene-picker="false" :speed-ms="180" />
+</div>
+
+<!--
+The full search to completion on the 12-cell example: watch the open-queue
+heap blocks, the distance labels inside each visited/queued cell, and the
+bold parent-edge tree grow up through the gap in the obstacle row. Toggle
+Manhattan to see the f-score line bend into an L-shape and compare the
+resulting node count.
+-->
+
+---
+layout: default
+---
+
 # Line 6, revisited: reconstructing the path
 
 <div class="panel text-xs mt-2">
@@ -497,73 +491,6 @@ visualizations do.
 </div>
 
 <<< ../reference/draw.js#path-reconstruct {*}{lines:true,startLine:64,maxHeight:'420px'}
-
----
-layout: default
----
-
-# Appendix: the rest of the reference implementation
-
-<div class="panel text-sm mt-4">
-
-The slides above cover every line of the pseudocode, but the reference implementation
-(`graph_search.js`, `draw.js`, `infrastructure.js`, `search_canvas.html`) includes a handful of
-supporting pieces none of them touch directly. For completeness, the next few slides cover:
-
-1. **Collision testing** (`infrastructure.js`) — the provided helper every scene's obstacle
-   layout is checked against
-2. **The animation loop** (`draw.js`) — how `iterateGraphSearch()` actually gets called once per
-   frame, and how it's told to stop
-3. **Reading the URL parameters** (`search_canvas.html`) — how `search_alg`, `planning_scene`,
-   `q_init`, `q_goal`, and `eps` get parsed into the globals every function above reads
-
-</div>
-
----
-layout: default
----
-
-# Appendix: collision testing
-
-<div class="panel text-xs mt-2">
-Every scene's obstacles are axis-aligned boxes, given as a <code>[x-range, y-range]</code> pair.
-A configuration is in collision if it falls inside <i>every</i> dimension's range for
-<i>any</i> obstacle — this is the function <code>testCollision()</code> that lines 8 and neighbor
-relaxation call on every candidate neighbor.
-</div>
-
-<<< ../reference/infrastructure.js#appendix-collision {*}{lines:true,startLine:40,maxHeight:'420px'}
-
----
-layout: default
----
-
-# Appendix: the animation loop
-
-<div class="panel text-xs mt-2">
-Called once per rendered frame. <code>search_iterate</code> gates whether it does anything at
-all — this is the flag <code>iterateGraphSearch()</code> sets to <code>false</code> to stop the
-search once it succeeds or fails (see "Lines 2–6" earlier). While it's still true, this is the
-dispatch that calls <code>iterateGraphSearch()</code> once per frame for every graph-search
-algorithm this deck covers.
-</div>
-
-<<< ../reference/draw.js#appendix-animate {*}{lines:true,startLine:254,maxHeight:'420px'}
-
----
-layout: default
----
-
-# Appendix: reading the URL parameters
-
-<div class="panel text-xs mt-2">
-<code>search_canvas.html</code>'s inline script sets defaults, then overwrites them from the
-page's own URL — this is what makes every example in this deck (and the <code>(link)</code> on
-the "KinEval Path Planning Stencil" slide) just a plain hyperlink, no server or build step
-involved.
-</div>
-
-<<< ../reference/search_canvas.html#appendix-url-params {*}{lines:true,startLine:65,maxHeight:'420px'}
 
 ---
 layout: default
@@ -648,3 +575,70 @@ class: text-center
 <div class="image-credit mt-2">Ford Fusion Next Generation Vehicle &#183; <a href="https://robots.engin.umich.edu/Projects/NGV">robots.engin.umich.edu/Projects/NGV</a></div>
 <div class="image-caption">Go Blue!</div>
 <div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding</div>
+
+---
+layout: default
+---
+
+# Appendix: the rest of the reference implementation
+
+<div class="panel text-sm mt-4">
+
+The slides above cover every line of the pseudocode, but the reference implementation
+(`graph_search.js`, `draw.js`, `infrastructure.js`, `search_canvas.html`) includes a handful of
+supporting pieces none of them touch directly. For completeness, the next few slides cover:
+
+1. **Collision testing** (`infrastructure.js`) — the provided helper every scene's obstacle
+   layout is checked against
+2. **The animation loop** (`draw.js`) — how `iterateGraphSearch()` actually gets called once per
+   frame, and how it's told to stop
+3. **Reading the URL parameters** (`search_canvas.html`) — how `search_alg`, `planning_scene`,
+   `q_init`, `q_goal`, and `eps` get parsed into the globals every function above reads
+
+</div>
+
+---
+layout: default
+---
+
+# Appendix: collision testing
+
+<div class="panel text-xs mt-2">
+Every scene's obstacles are axis-aligned boxes, given as a <code>[x-range, y-range]</code> pair.
+A configuration is in collision if it falls inside <i>every</i> dimension's range for
+<i>any</i> obstacle — this is the function <code>testCollision()</code> that lines 8 and neighbor
+relaxation call on every candidate neighbor.
+</div>
+
+<<< ../reference/infrastructure.js#appendix-collision {*}{lines:true,startLine:40,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Appendix: the animation loop
+
+<div class="panel text-xs mt-2">
+Called once per rendered frame. <code>search_iterate</code> gates whether it does anything at
+all — this is the flag <code>iterateGraphSearch()</code> sets to <code>false</code> to stop the
+search once it succeeds or fails (see "Lines 2–6" earlier). While it's still true, this is the
+dispatch that calls <code>iterateGraphSearch()</code> once per frame for every graph-search
+algorithm this deck covers.
+</div>
+
+<<< ../reference/draw.js#appendix-animate {*}{lines:true,startLine:254,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Appendix: reading the URL parameters
+
+<div class="panel text-xs mt-2">
+<code>search_canvas.html</code>'s inline script sets defaults, then overwrites them from the
+page's own URL — this is what makes every example in this deck (and the <code>(link)</code> on
+the "KinEval Path Planning Stencil" slide) just a plain hyperlink, no server or build step
+involved.
+</div>
+
+<<< ../reference/search_canvas.html#appendix-url-params {*}{lines:true,startLine:65,maxHeight:'420px'}
