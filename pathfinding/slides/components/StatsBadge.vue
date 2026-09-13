@@ -5,9 +5,15 @@ withDefaults(
     queued?: number | null
     pathLength?: number | null
     status?: 'idle' | 'iterating' | 'succeeded' | 'failed'
+    manhattan?: boolean
+    showManhattan?: boolean
   }>(),
-  { queued: null, pathLength: null, status: undefined },
+  { queued: null, pathLength: null, status: undefined, manhattan: false, showManhattan: true },
 )
+
+const emit = defineEmits<{
+  'update:manhattan': [boolean]
+}>()
 </script>
 
 <template>
@@ -16,6 +22,13 @@ withDefaults(
     <span v-if="queued !== null" class="stat">queued <b>{{ queued }}</b></span>
     <span v-if="pathLength !== null" class="stat">path length <b>{{ pathLength.toFixed(2) }}</b></span>
     <span v-if="status" class="status" :class="status">{{ status }}</span>
+    <label v-if="showManhattan" class="checkbox-picker">
+      <input
+        type="checkbox" :checked="manhattan"
+        @change="emit('update:manhattan', ($event.target as HTMLInputElement).checked)"
+      />
+      Manhattan
+    </label>
   </div>
 </template>
 
@@ -44,4 +57,15 @@ withDefaults(
 .status.iterating { background: var(--gmaps-yellow, #fbbc04); }
 .status.succeeded { background: var(--gmaps-green, #34a853); color: #fff; }
 .status.failed { background: var(--gmaps-red, #ea4335); color: #fff; }
+.checkbox-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.checkbox-picker input {
+  cursor: pointer;
+}
 </style>

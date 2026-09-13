@@ -11,11 +11,13 @@ export interface GridNode {
 }
 
 export type SearchAlg = 'A-star' | 'greedy-best-first' | 'breadth-first' | 'depth-first'
+export type HeuristicMode = 'euclidean' | 'manhattan'
 
 // One action per pseudocode line (see lib/astar/pseudocode.ts), so every
 // line gets its own step during the search -- some lines (8, 10) fork into
 // two actions depending on which branch is taken.
 export type StepAction =
+  | 'find-start'        // line 0
   | 'check-queue'       // line 2
   | 'fail'              // line 14 (queue was empty)
   | 'pop'               // line 3
@@ -53,6 +55,7 @@ export interface AStarStep {
   neighbor?: { x: number; y: number }
   tentativeDistance?: number
   neighborPriority?: number
+  neighborHeuristic?: number
   path?: { x: number; y: number }[]
   heap: HeapEntry[]
 }

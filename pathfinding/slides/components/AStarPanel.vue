@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { sceneById } from '../lib/astar/scenes'
 import { astarPseudocode } from '../lib/astar/pseudocode'
 import { useAStarTracer } from '../lib/astar/useAStarTracer'
-import type { SearchAlg } from '../lib/astar/types'
+import type { HeuristicMode, SearchAlg } from '../lib/astar/types'
 import MapCanvas from './MapCanvas.vue'
 import AStarControls from './AStarControls.vue'
 import PseudocodePanel from './PseudocodePanel.vue'
@@ -36,16 +36,21 @@ const searchAlg = ref<SearchAlg>(props.initialAlg)
 const scene = computed(() => sceneById(sceneId.value))
 const showRouting = ref(true)
 const skipQueueing = ref(false)
+const heuristicMode = ref<HeuristicMode>('euclidean')
+const manhattan = computed({
+  get: () => heuristicMode.value === 'manhattan',
+  set: (v: boolean) => { heuristicMode.value = v ? 'manhattan' : 'euclidean' },
+})
 
 const speed = ref(props.speedMs)
-const tracer = useAStarTracer(speed, skipQueueing)
+const tracer = useAStarTracer(speed, skipQueueing, heuristicMode)
 
 function reload() {
   tracer.load(scene.value, searchAlg.value)
 }
 
 onMounted(reload)
-watch([sceneId, searchAlg], reload)
+watch([sceneId, searchAlg, heuristicMode], reload)
 
 const pathLength = computed(() => {
   if (tracer.path.value.length < 2) return null
@@ -92,6 +97,8 @@ const pathLength = computed(() => {
           :queued="tracer.queuedCount.value"
           :path-length="pathLength"
           :status="tracer.status.value"
+          :manhattan="manhattan"
+          @update:manhattan="manhattan = $event"
         />
       </div>
       <div class="heap-wrap">
@@ -110,6 +117,9 @@ const pathLength = computed(() => {
         :current-node="tracer.currentNode.value"
         :neighbor-node="tracer.neighborNode.value"
         :neighbor-priority="tracer.neighborPriority.value"
+        :neighbor-g-score="tracer.neighborGScore.value"
+        :neighbor-h-score="tracer.neighborHScore.value"
+        :heuristic-mode="heuristicMode"
         :show-routing="showRouting"
       />
     </div>

@@ -59,9 +59,9 @@ making A-star, from its very first publication, a *robotics* algorithm.
 </div>
 <div>
 <div class="side-image">
-<img src="/images/shakey.jpg" alt="Shakey the robot on display at the Computer History Museum" />
+<img src="/images/shakey.jpg" alt="Shakey the robot, with callouts labeling its parts" />
 </div>
-<div class="side-caption">Shakey the Robot, SRI International, 1966–1972 &#183; Computer History Museum. Credit: Wikimedia Commons.</div>
+<div class="side-caption">Shakey the Robot, SRI International, 1966–1972 &#183; Credit: Wikimedia Commons.</div>
 </div>
 </div>
 
@@ -93,17 +93,55 @@ original use case — turn-by-turn directions across town.
   <figcaption>May Mobility autonomous shuttle, Detroit</figcaption>
 </figure>
 <figure>
-  <img src="/images/agility-digit.jpg" alt="An Agility Robotics Digit humanoid carrying a package" />
-  <figcaption>Agility Robotics Digit, Ford Robotics Building, UM</figcaption>
+  <img src="/images/route-map.jpg" alt="A driving route from the UM Robotics Building to Detroit Street Filling Station" />
+  <figcaption>Robotics Building &rarr; Detroit St. Filling Station (OpenStreetMap route, standing in for an Apple Maps snapshot)</figcaption>
 </figure>
 <figure>
   <img src="/images/mbot-omni.jpg" alt="An MBot omni-wheel education robot" />
   <figcaption>MBot Omni education robot</figcaption>
 </figure>
 <figure>
-  <img src="/images/route-map.jpg" alt="A driving route from the UM Robotics Building to Detroit Street Filling Station" />
-  <figcaption>Robotics Building &rarr; Detroit St. Filling Station (OpenStreetMap route, standing in for an Apple Maps snapshot)</figcaption>
+  <img src="/images/agility-digit.jpg" alt="An Agility Robotics Digit humanoid carrying a package" />
+  <figcaption>Agility Robotics Digit, Ford Robotics Building, UM</figcaption>
 </figure>
+</div>
+</div>
+
+---
+layout: default
+---
+
+# KinEval Path Planning Stencil <a class="accent" href="https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/narrow2.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1" target="_blank">(link)</a>
+
+<div class="split-panel">
+<div class="side-image">
+<img src="/images/kineval-narrow2.jpg" alt="KinEval search canvas interface showing a completed A-star path through the narrow2 scene" />
+</div>
+<div class="panel text-xs">
+
+The reference implementation runs standalone, no build step, straight from `search_canvas.html`.
+Every run is configured entirely through URL parameters:
+
+| Parameter | Values |
+|---|---|
+| `search_alg` | `A-star`, `greedy-best-first`, `breadth-first`, `depth-first`<br><span class="meaning">which priority formula drives the search</span> |
+| `planning_scene` | `empty`, `misc`, `narrow1`, `narrow2`, `three_sections` (the original kineval-stencil scenes), or a custom path like `scenes/spiral.js`<br><span class="meaning">which obstacle layout to load</span> |
+| `q_init` | `[x,y]`<br><span class="meaning">start location</span> |
+| `q_goal` | `[x,y]`<br><span class="meaning">goal location</span> |
+| `eps` | a number<br><span class="meaning">grid spacing (smaller = finer, slower)</span> |
+| `color_scheme` | `default`, `light`, `blue`<br><span class="meaning">canvas color palette</span> |
+
+```text
+search_canvas.html
+  ?search_alg=A-star
+  ?planning_scene=scenes/narrow2.js
+  ?q_init=[0,0]?q_goal=[4,4]?eps=0.1
+```
+
+**Run it live:** [ocj-dev.github.io/kineval/kineval/pathplanning](https://ocj-dev.github.io/kineval/kineval/pathplanning/search_canvas.html?search_alg=A-star?planning_scene=scenes/narrow2.js?q_init=[0,0]?q_goal=[4,4]?eps=0.1)
+
+**Previous version (Winter 2023):** [autorob.org/archive/assignment-1-path-planning](https://autorob.org/archive/assignment-1-path-planning/)
+
 </div>
 </div>
 
@@ -136,6 +174,7 @@ admissible heuristic is exactly what guarantees A-star still finds the *shortest
 <div class="panel">
 
 ```text
+ 0  find the start node for the search from the q_init user parameter
  1  initialize the open queue with the start node (distance 0)
  2  while the open queue is not empty
  3      pop the node with minimum priority from the open queue
@@ -156,7 +195,36 @@ admissible heuristic is exactly what guarantees A-star still finds the *shortest
 </div>
 
 <div class="mt-2 text-xs opacity-60">
-Next: a hand-worked example on a tiny grid, before diving into the real code.
+Next: which components implement which lines, then a hand-worked example on a tiny grid.
+</div>
+
+---
+layout: default
+---
+
+# Component breakdown
+
+<div class="panel text-sm mt-4">
+
+The upcoming slides walk the reference implementation
+(`kineval/pathfinding/reference/graph_search.js`) one pseudocode line at a time. **Line 13**
+(inserting into the open queue) comes first, right after the hand-worked grid setup below, since
+it's needed to make sense of the very first step in that example; the remaining components follow
+afterward, in dependency order — the other heap primitive, then the rest of setup, the heuristic,
+the two loop bodies, and finally how the result gets turned into a path:
+
+1. **Line 13** — insert a node into the open queue (`minheap_insert`)
+2. **Line 3** — pop the minimum-priority node (`minheap_extract`)
+3. **Line 1** — initialize the open queue with the start node
+4. **Line 12** — the priority formula, `f = g + h`
+5. **Lines 2–6** — the main loop: pop, discard stale entries, visit, goal test
+6. **Lines 7–13** — expanding neighbors: collision checks and edge relaxation
+7. **Line 6**, revisited — reconstructing the path once the goal is reached
+
+Every snippet is imported directly from the shipped reference file — not retyped — with line
+numbers matching that file exactly. A short appendix after the code walkthrough covers the
+handful of supporting functions none of these slides touch directly.
+
 </div>
 
 ---
@@ -198,7 +266,36 @@ search reconstruct a route at the end), <code>visited</code> (finalized, never r
 <code>priority</code> (what the open-queue heap sorts on).
 </div>
 
-<<< ../reference/graph_search.js#grid-node-fields {*}{lines:true,startLine:61,maxHeight:'420px'}
+<<< ../reference/graph_search.js#grid-node-fields {*}{lines:true,startLine:64,maxHeight:'380px'}
+
+---
+layout: default
+---
+
+# Which cell is the start cell?
+
+<div class="panel text-xs mt-2">
+<code>q_init</code> generally won't land exactly on a grid point, so <code>initSearchGraph()</code>
+tracks the single closest grid node to it (line 0) while it builds the grid — the same
+double loop that lays out every cell's fields above also does this bookkeeping along the way.
+</div>
+
+<<< ../reference/graph_search.js#find-start-cell {*}{lines:true,startLine:53,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Line 13: insert into the open queue
+
+<div class="panel text-xs mt-2">
+<code>minheap_insert</code> appends the new element, then "sifts up" by repeatedly swapping with
+its parent while it is smaller — O(log n). A node may be inserted more than once if a
+cheaper path to it is found later; the main loop's stale-entry check (line 4) discards the
+leftover duplicate lazily when it is eventually popped.
+</div>
+
+<<< ../reference/graph_search.js#insert-queue {*}{lines:true,startLine:235,maxHeight:'420px'}
 
 ---
 layout: default
@@ -211,11 +308,11 @@ layout: default
 </div>
 
 <!--
-Step forward a few times: the start node is queued (line 1), the loop
-checks the queue (line 2), pops the only entry (line 3), and marks it
-visited (line 5) -- the open-queue block on the left shows the heap array
-shrink from one entry to zero, right before the goal check and neighbor
-expansion begin.
+Step forward a few times: the start node is found (line 0) and queued
+(line 1), the loop checks the queue (line 2), pops the only entry (line 3),
+and marks it visited (line 5) -- the open-queue block on the left shows the
+heap array shrink from one entry to zero, right before the goal check and
+neighbor expansion begin.
 -->
 
 ---
@@ -224,22 +321,62 @@ layout: default
 
 # The admissible heuristic
 
-<div class="panel text-sm mt-4">
+<div class="split-panel">
+<div class="panel text-sm">
 
 For a 4-connected grid, the true remaining cost from any cell to the goal is at least its
 **Euclidean (straight-line) distance** — grid moves can only ever be as short as a straight
-line, never shorter. That's exactly what makes `h = Euclidean distance to goal` **admissible**:
-it never overestimates.
-
-This is the whole argument for why A-star is optimal: as long as `h` never overestimates, the
-first time A-star pops the goal off the open queue, `g` at that moment is guaranteed to be the
-true shortest distance — no cheaper path could still be waiting in the queue, because anything
+line, never shorter. That's what makes Euclidean distance **admissible**: it never overestimates,
+which is the whole argument for why A-star is optimal — the first time A-star pops the goal off
+the open queue, `g` at that moment is guaranteed to be the true shortest distance, since anything
 cheaper would have had a smaller `f = g + h` and been popped first.
+
+**Manhattan (taxicab) distance**, `|dx| + |dy|`, is *also* admissible on a 4-connected grid —
+diagonal movement isn't allowed, so the true remaining cost can never be less than it either. It's
+a **tighter** bound than Euclidean (Euclidean ≤ Manhattan ≤ true distance always), making it a
+more informed estimate that typically visits fewer nodes while remaining just as optimal. Try the
+**Manhattan** checkbox on the visualizations ahead to see the difference.
 
 Drop the `g` term entirely (priority `= h` alone) and you get **greedy-best-first** — fast, but
 no longer guaranteed optimal, since it can be lured toward a dead end that merely *looks* close
 to the goal. The Cul-de-Sac test case later in this deck shows exactly that happening.
 
+</div>
+<div>
+<div class="side-image">
+<img src="/images/admissible-heuristic-diagram.png" alt="Diagram showing g(N), h(N), and h*(N) for a node N on a path from A to B around an obstacle, illustrating h(N) <= h*(N)" />
+</div>
+<div class="side-caption">Admissibility: h(N) never overestimates the true remaining cost h*(N). Widely used course-material diagram; original author unconfirmed.</div>
+</div>
+</div>
+
+---
+layout: default
+---
+
+# Same cell, two heuristics
+
+<div class="split-panel">
+<div class="panel" style="display:flex; flex-direction:column;">
+<HeuristicExampleGrid mode="euclidean" />
+<div class="text-xs mt-2">
+Euclidean: <code>h = &radic;(2&sup2; + 1&sup2;) = &radic;5 &asymp; 2.24</code>, so
+<code>f = g + h = 2 + 2.24 = <b>4.24</b></code>
+</div>
+</div>
+<div class="panel" style="display:flex; flex-direction:column;">
+<HeuristicExampleGrid mode="manhattan" />
+<div class="text-xs mt-2">
+Manhattan: <code>h = |2| + |1| = <b>3</b></code>, so
+<code>f = g + h = 2 + 3 = <b>5.00</b></code>
+</div>
+</div>
+</div>
+
+<div class="mt-2 text-xs opacity-60">
+A real step from the simple grid above: the cell in the leftmost column, second-from-top row,
+being relaxed by the cell directly below it. Same <code>g</code> either way (the actual distance
+traveled); only the heuristic estimate of the remaining distance to the goal changes.
 </div>
 
 ---
@@ -255,34 +392,10 @@ layout: default
 <!--
 The full search to completion on the 12-cell example: watch the open-queue
 heap blocks, the distance labels inside each visited/queued cell, and the
-bold parent-edge tree grow up through the gap in the obstacle row.
+bold parent-edge tree grow up through the gap in the obstacle row. Toggle
+Manhattan to see the f-score line bend into an L-shape and compare the
+resulting node count.
 -->
-
----
-layout: default
----
-
-# Component breakdown
-
-<div class="panel text-sm mt-4">
-
-The next several slides walk the reference implementation
-(`kineval/pathfinding/reference/graph_search.js`) one pseudocode line at a time, in dependency
-order — the two heap primitives first (everything else calls them), then setup, then the
-heuristic, then the two loop bodies, then how the result gets turned into a path:
-
-1. **Line 3** — pop the minimum-priority node (`minheap_extract`)
-2. **Line 13** — insert a node into the open queue (`minheap_insert`)
-3. **Line 1** — initialize the open queue with the start node
-4. **Line 12** — the priority formula, `f = g + h`
-5. **Lines 2–6** — the main loop: pop, discard stale entries, visit, goal test
-6. **Lines 7–13** — expanding neighbors: collision checks and edge relaxation
-7. **Line 6**, revisited — reconstructing the path once the goal is reached
-
-Every snippet is imported directly from the shipped reference file — not retyped — with line
-numbers matching that file exactly.
-
-</div>
 
 ---
 layout: default
@@ -296,22 +409,7 @@ end, then "sifts down" the new root by repeatedly swapping with its smaller chil
 heap invariant is restored — O(log n).
 </div>
 
-<<< ../reference/graph_search.js#pop-min {*}{lines:true,startLine:250,maxHeight:'420px'}
-
----
-layout: default
----
-
-# Line 13: insert into the open queue
-
-<div class="panel text-xs mt-2">
-<code>minheap_insert</code> appends the new element, then "sifts up" by repeatedly swapping with
-its parent while it is smaller — also O(log n). A node may be inserted more than once if a
-cheaper path to it is found later; the main loop's stale-entry check (line 4) discards the
-leftover duplicate lazily when it is eventually popped.
-</div>
-
-<<< ../reference/graph_search.js#insert-queue {*}{lines:true,startLine:231,maxHeight:'420px'}
+<<< ../reference/graph_search.js#pop-min {*}{lines:true,startLine:254,maxHeight:'420px'}
 
 ---
 layout: default
@@ -320,12 +418,11 @@ layout: default
 # Line 1: initialize the open queue
 
 <div class="panel text-xs mt-2">
-The start location generally won't land exactly on a grid point, so <code>initSearchGraph()</code>
-tracks the single closest grid node while building the grid, then queues that node with zero
-distance — the seed the entire search grows from.
+Once the closest grid node to <code>q_init</code> has been found (line 0), <code>initSearchGraph()</code>
+queues that node with zero distance — the seed the entire search grows from.
 </div>
 
-<<< ../reference/graph_search.js#init-start {*}{lines:true,startLine:83,maxHeight:'420px'}
+<<< ../reference/graph_search.js#init-start {*}{lines:true,startLine:87,maxHeight:'420px'}
 
 ---
 layout: default
@@ -339,7 +436,7 @@ loop into greedy-best-first, breadth-first, or a depth-first emulation — the r
 implementation supports all four via the <code>search_alg</code> switch.
 </div>
 
-<<< ../reference/graph_search.js#priority-formula {*}{lines:true,startLine:200,maxHeight:'420px'}
+<<< ../reference/graph_search.js#priority-formula {*}{lines:true,startLine:204,maxHeight:'420px'}
 
 ---
 layout: default
@@ -357,7 +454,7 @@ function the moment the search succeeds or fails, instead of keeping the search 
 past the point it found (or ruled out) a path.
 </div>
 
-<<< ../reference/graph_search.js#main-loop {*}{lines:true,startLine:111,maxHeight:'420px'}
+<<< ../reference/graph_search.js#main-loop {*}{lines:true,startLine:115,maxHeight:'380px'}
 
 ---
 layout: default
@@ -371,7 +468,7 @@ of stepping there, and <i>relax</i> the edge — update the neighbor's distance/
 (re)queue it — only if this path to it is cheaper than any found before.
 </div>
 
-<<< ../reference/graph_search.js#neighbor-loop {*}{lines:true,startLine:152,maxHeight:'420px'}
+<<< ../reference/graph_search.js#neighbor-loop {*}{lines:true,startLine:156,maxHeight:'420px'}
 
 ---
 layout: default
@@ -381,11 +478,80 @@ layout: default
 
 <div class="panel text-xs mt-2">
 Once the goal is reached, the path is just the chain of <code>parent</code> pointers back to the
-start — walked once here to draw it, exactly the same chain this deck's visualizations walk to
-render their red route line (the search tree of all explored parent edges stays blue).
+start — walked here to draw it, plus one extra segment out to the exact goal coordinate (the
+nearest visited node is only guaranteed to be within <code>eps</code> of the goal, not on top of
+it) so the drawn path always fully connects start to goal, exactly like this deck's own
+visualizations do.
 </div>
 
 <<< ../reference/draw.js#path-reconstruct {*}{lines:true,startLine:64,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Appendix: the rest of the reference implementation
+
+<div class="panel text-sm mt-4">
+
+The slides above cover every line of the pseudocode, but the reference implementation
+(`graph_search.js`, `draw.js`, `infrastructure.js`, `search_canvas.html`) includes a handful of
+supporting pieces none of them touch directly. For completeness, the next few slides cover:
+
+1. **Collision testing** (`infrastructure.js`) — the provided helper every scene's obstacle
+   layout is checked against
+2. **The animation loop** (`draw.js`) — how `iterateGraphSearch()` actually gets called once per
+   frame, and how it's told to stop
+3. **Reading the URL parameters** (`search_canvas.html`) — how `search_alg`, `planning_scene`,
+   `q_init`, `q_goal`, and `eps` get parsed into the globals every function above reads
+
+</div>
+
+---
+layout: default
+---
+
+# Appendix: collision testing
+
+<div class="panel text-xs mt-2">
+Every scene's obstacles are axis-aligned boxes, given as a <code>[x-range, y-range]</code> pair.
+A configuration is in collision if it falls inside <i>every</i> dimension's range for
+<i>any</i> obstacle — this is the function <code>testCollision()</code> that lines 8 and neighbor
+relaxation call on every candidate neighbor.
+</div>
+
+<<< ../reference/infrastructure.js#appendix-collision {*}{lines:true,startLine:40,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Appendix: the animation loop
+
+<div class="panel text-xs mt-2">
+Called once per rendered frame. <code>search_iterate</code> gates whether it does anything at
+all — this is the flag <code>iterateGraphSearch()</code> sets to <code>false</code> to stop the
+search once it succeeds or fails (see "Lines 2–6" earlier). While it's still true, this is the
+dispatch that calls <code>iterateGraphSearch()</code> once per frame for every graph-search
+algorithm this deck covers.
+</div>
+
+<<< ../reference/draw.js#appendix-animate {*}{lines:true,startLine:254,maxHeight:'420px'}
+
+---
+layout: default
+---
+
+# Appendix: reading the URL parameters
+
+<div class="panel text-xs mt-2">
+<code>search_canvas.html</code>'s inline script sets defaults, then overwrites them from the
+page's own URL — this is what makes every example in this deck (and the <code>(link)</code> on
+the "KinEval Path Planning Stencil" slide) just a plain hyperlink, no server or build step
+involved.
+</div>
+
+<<< ../reference/search_canvas.html#appendix-url-params {*}{lines:true,startLine:65,maxHeight:'420px'}
 
 ---
 layout: default
@@ -404,7 +570,8 @@ forward walks the pseudocode one line at a time; Play runs the full trace.
 The legend above the map explains the cell colors, the numbers inside
 visited/queued cells are their current distance, the bold blue lines are
 the search tree of parent edges, and the dashed red line from a
-just-queued cell to the goal shows its f-score.
+just-queued cell to the goal shows its f-score (toggle Manhattan to bend
+it into an L-shape and compare g/h/f for the currently examined neighbor).
 -->
 
 ---
@@ -451,52 +618,21 @@ end and settles for a longer one.
 
 ---
 layout: default
----
-
-# Try this yourself
-
-<div class="split-panel">
-<div class="side-image">
-<img src="/images/kineval-narrow2.jpg" alt="KinEval search canvas interface showing a completed A-star path through the narrow2 scene" />
-</div>
-<div class="panel text-xs">
-
-The reference implementation runs standalone, no build step, straight from `search_canvas.html`.
-Every run is configured entirely through URL parameters:
-
-| Parameter | Values |
-|---|---|
-| `search_alg` | `A-star`, `greedy-best-first`, `breadth-first`, `depth-first`<br><span class="meaning">which priority formula drives the search</span> |
-| `planning_scene` | a built-in name, or a path like `scenes/spiral.js`<br><span class="meaning">which obstacle layout to load</span> |
-| `q_init` | `[x,y]`<br><span class="meaning">start location</span> |
-| `q_goal` | `[x,y]`<br><span class="meaning">goal location</span> |
-| `eps` | a number<br><span class="meaning">grid spacing (smaller = finer, slower)</span> |
-| `color_scheme` | `default`, `light`, `blue`<br><span class="meaning">canvas color palette</span> |
-
-```text
-search_canvas.html
-  ?search_alg=A-star
-  ?planning_scene=scenes/spiral.js
-  ?q_init=[0,0]?q_goal=[4,4]?eps=0.2
-```
-
-**Run it live:** [ocj-dev.github.io/kineval/kineval/pathplanning](https://ocj-dev.github.io/kineval/kineval/pathplanning/)
-
-**Previous version (Winter 2023):** [autorob.org/archive/assignment-1-path-planning](https://autorob.org/archive/assignment-1-path-planning/)
-
-</div>
-</div>
-
----
-layout: default
 class: text-center
 ---
 
-<div class="content-body image-slide">
-<a href="https://robots.engin.umich.edu/Projects/NGV" target="_blank" class="side-image" style="display:inline-block;max-height:76%;">
-<img src="/images/ford-fusion-ngv.jpg" class="hero-image" alt="A Ford Fusion Next Generation Vehicle autonomous research car" />
+<div class="split-panel">
+<div>
+<a href="https://robots.engin.umich.edu/Projects/NGV" target="_blank" class="side-image">
+<img src="/images/ford-fusion-ngv.jpg" alt="A Ford Fusion Next Generation Vehicle autonomous research car" />
 </a>
-<div class="image-credit">Ford Fusion Next Generation Vehicle &#183; <a href="https://robots.engin.umich.edu/Projects/NGV">robots.engin.umich.edu/Projects/NGV</a></div>
+</div>
+<div>
+<a href="https://robots.engin.umich.edu/Projects/NGV" target="_blank" class="side-image">
+<img src="/images/ford-fusion-ngv2.jpg" alt="LIDAR point-cloud view from a Ford Fusion Next Generation Vehicle, detecting a car, trees, and lane markings" />
+</a>
+</div>
+</div>
+<div class="image-credit mt-2">Ford Fusion Next Generation Vehicle &#183; <a href="https://robots.engin.umich.edu/Projects/NGV">robots.engin.umich.edu/Projects/NGV</a></div>
 <div class="image-caption">Go Blue!</div>
 <div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding</div>
-</div>

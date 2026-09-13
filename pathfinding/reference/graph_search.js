@@ -49,8 +49,11 @@ function initSearchGraph() {
     //   of 2D locations with specified spatial resolution
     G = [];
 
-    // track the single closest grid node to q_init while building the grid,
-    //   since q_init generally will not land exactly on a grid point
+    // #region find-start-cell
+    // pseudocode line 0: find the start node for the search from the
+    //   q_init user parameter. q_init generally will not land exactly on
+    //   a grid point, so track the single closest grid node to it while
+    //   building the grid.
     var closest_start_node = null;
     var closest_start_dist = Infinity;
 
@@ -78,6 +81,7 @@ function initSearchGraph() {
             }
         }
     }
+    // #endregion find-start-cell
 
     // #region init-start
     // pseudocode line 1: the start node has zero distance from itself and

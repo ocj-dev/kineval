@@ -14,9 +14,9 @@ withDefaults(
       v-for="(line, i) in lines"
       :key="i"
       class="pc-line"
-      :class="{ active: i + 1 === activeLine, blank: !line }"
+      :class="{ active: i === activeLine, blank: !line }"
     >
-      <span class="pc-num">{{ i + 1 }}</span>
+      <span class="pc-num">{{ i }}</span>
       <span class="pc-text">{{ line || ' ' }}</span>
     </div>
   </div>

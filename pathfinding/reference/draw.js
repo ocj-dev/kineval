@@ -72,6 +72,19 @@ function drawHighlightedPathGraph(current_node) {
     // traverse path back to start and draw path
     ctx.lineWidth=4;
     path_length = 0;
+
+    // the closest visited node to the goal is only guaranteed to be within
+    //   eps of it, not exactly on top of it -- draw one extra segment out
+    //   to the exact goal coordinate so the drawn path always fully
+    //   connects the goal marker to the rest of the route, not just to the
+    //   nearest grid point
+    ctx.strokeStyle = path_start;
+    ctx.beginPath();
+    ctx.moveTo(xformWorldViewX(current_node.x),xformWorldViewY(current_node.y));
+    ctx.lineTo(xformWorldViewX(q_goal[0]),xformWorldViewY(q_goal[1]));
+    ctx.closePath();
+    ctx.stroke();
+
     q_path_ref = current_node;
     while (q_path_ref.distance > 0) {
         if (testCollision([q_path_ref.x, q_path_ref.y])) {
@@ -237,6 +250,7 @@ function initColorScheme(scheme_name) {
 /////     ANIMATION AND INTERACTION LOOP
 //////////////////////////////////////////////////
 
+// #region appendix-animate
 function animate() {
 
     // IMPORTANT:
@@ -293,6 +307,7 @@ function animate() {
                 break;
         }
     }
+    // #endregion appendix-animate
 
     if (draw_path) {
         if (search_alg.includes("RRT")) {

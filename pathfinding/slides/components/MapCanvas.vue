@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Scene } from '../lib/astar/types'
+import type { HeuristicMode, Scene } from '../lib/astar/types'
 import { testCollision, nodeKey } from '../lib/astar/aStarSteps'
 
 const props = withDefaults(
@@ -14,6 +14,9 @@ const props = withDefaults(
     currentNode?: { x: number; y: number } | null
     neighborNode?: { x: number; y: number } | null
     neighborPriority?: number | null
+    neighborGScore?: number | null
+    neighborHScore?: number | null
+    heuristicMode?: HeuristicMode
     showRouting?: boolean
   }>(),
   {
@@ -25,6 +28,9 @@ const props = withDefaults(
     currentNode: null,
     neighborNode: null,
     neighborPriority: null,
+    neighborGScore: null,
+    neighborHScore: null,
+    heuristicMode: 'euclidean',
     showRouting: true,
   },
 )
@@ -128,15 +134,21 @@ function routeToStart(x: number, y: number): { x: number; y: number }[] {
 
 // The tentative route "through" the neighbor currently being enqueued:
 // the actual (solid) path back to the start via the current node, plus the
-// (dashed) straight-line heuristic estimate from the neighbor to the goal.
+// (dashed) heuristic-distance estimate from the neighbor to the goal --
+// a straight line for Euclidean, or an L-shaped (axis-aligned) line for
+// Manhattan, matching whichever distance actually computed the f-score.
 // Only shown once the neighbor's f-score has actually been computed
 // (lines 12-13), not merely while it's being considered (lines 7-10).
 const tentativeRoute = computed(() => {
   if (!props.neighborNode || props.neighborPriority === null || !props.currentNode) return null
   const solidPoints = [...routeToStart(props.currentNode.x, props.currentNode.y), props.neighborNode]
+  const goal = { x: props.scene.qGoal[0], y: props.scene.qGoal[1] }
+  const dashedPoints = props.heuristicMode === 'manhattan'
+    ? [props.neighborNode, { x: goal.x, y: props.neighborNode.y }, goal]
+    : [props.neighborNode, goal]
   return {
     solid: pointsAttr(solidPoints),
-    dashed: `${pointsAttr([props.neighborNode])} ${pointsAttr([{ x: props.scene.qGoal[0], y: props.scene.qGoal[1] }])}`,
+    dashed: pointsAttr(dashedPoints),
   }
 })
 
@@ -164,7 +176,11 @@ const finalRouteLine = computed(() => {
       <span class="swatch queued" /> Queued
     </div>
     <div class="map-wrap" :class="{ 'scene-teaching': scene.isTeachingExample }">
-      <div v-if="showRouting && neighborPriority !== null" class="fscore-label">f = {{ neighborPriority.toFixed(1) }}</div>
+      <div v-if="showRouting && neighborPriority !== null" class="fscore-label">
+        <div>f = {{ neighborPriority.toFixed(2) }}</div>
+        <div v-if="neighborGScore !== null" class="fscore-sub">g = {{ neighborGScore.toFixed(2) }}</div>
+        <div v-if="neighborHScore !== null" class="fscore-sub">h = {{ neighborHScore.toFixed(2) }}</div>
+      </div>
       <div class="map-grid" :style="{ gridTemplateColumns: `repeat(${numCols}, 1fr)` }">
         <template v-for="row in cells" :key="row[0]?.y">
           <div
@@ -248,8 +264,14 @@ const finalRouteLine = computed(() => {
   font-family: var(--font-mono, monospace);
   font-weight: 700;
   font-size: 0.65em;
-  padding: 0.15em 0.5em;
+  padding: 0.25em 0.6em;
   border-radius: 6px;
+  line-height: 1.35;
+}
+.fscore-sub {
+  font-weight: 500;
+  opacity: 0.8;
+  font-size: 0.85em;
 }
 .map-grid {
   display: grid;

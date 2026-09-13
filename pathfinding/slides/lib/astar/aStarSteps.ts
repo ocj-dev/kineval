@@ -1,4 +1,4 @@
-import type { AStarStep, GridNode, HeapEntry, Scene, SearchAlg } from './types'
+import type { AStarStep, GridNode, HeapEntry, HeuristicMode, Scene, SearchAlg } from './types'
 
 // A step-generator port of ../../reference/graph_search.js for driving the
 // interactive visualization in the browser. It is kept structurally
@@ -26,22 +26,27 @@ export function testCollision(scene: Scene, q: [number, number]): boolean {
   return false
 }
 
-function heuristic(node: GridNode, goal: [number, number]): number {
-  return Math.hypot(node.x - goal[0], node.y - goal[1])
+export function heuristic(node: { x: number; y: number }, goal: [number, number], mode: HeuristicMode = 'euclidean'): number {
+  const dx = node.x - goal[0]
+  const dy = node.y - goal[1]
+  return mode === 'manhattan' ? Math.abs(dx) + Math.abs(dy) : Math.hypot(dx, dy)
 }
 
-// mirrors computeNodePriority() in reference/graph_search.js
-function computePriority(node: GridNode, goal: [number, number], alg: SearchAlg, expansionCounter: number): number {
+// mirrors computeNodePriority() in reference/graph_search.js -- the
+// reference implementation always uses the Euclidean heuristic; `mode`
+// here is a visualization-only extension for the "Manhattan" toggle in
+// this deck's animations, letting the same formula illustrate both.
+function computePriority(node: GridNode, goal: [number, number], alg: SearchAlg, expansionCounter: number, mode: HeuristicMode): number {
   switch (alg) {
     case 'greedy-best-first':
-      return heuristic(node, goal)
+      return heuristic(node, goal, mode)
     case 'breadth-first':
       return node.distance
     case 'depth-first':
       return -expansionCounter
     case 'A-star':
     default:
-      return node.distance + heuristic(node, goal)
+      return node.distance + heuristic(node, goal, mode)
   }
 }
 
@@ -82,6 +87,7 @@ function heapSnapshot(heap: GridNode[]): HeapEntry[] {
   return heap.map((n) => ({ i: n.i, j: n.j, x: n.x, y: n.y, priority: n.priority! }))
 }
 
+// mirrors the pseudocode-line-0/find-start-cell region of initSearchGraph()
 export function buildGrid(scene: Scene): { grid: GridNode[][]; start: GridNode } {
   const { xMin, xMax, yMin, yMax, eps } = scene.gridBounds
   const grid: GridNode[][] = []
@@ -112,6 +118,7 @@ export function buildGrid(scene: Scene): { grid: GridNode[][]; start: GridNode }
 }
 
 // pseudocode:
+//  0  find the start node for the search from the q_init user parameter
 //  1  initialize the open queue with the start node (distance 0)
 //  2  while the open queue is not empty
 //  3      pop the node with minimum priority from the open queue
@@ -126,9 +133,11 @@ export function buildGrid(scene: Scene): { grid: GridNode[][]; start: GridNode }
 // 12              neighbor.priority = f(neighbor)
 // 13              insert the neighbor into the open queue
 // 14  the open queue emptied out -- no path exists; fail
-export function* aStarSteps(scene: Scene, searchAlg: SearchAlg = 'A-star'): Generator<AStarStep, void, unknown> {
+export function* aStarSteps(scene: Scene, searchAlg: SearchAlg = 'A-star', heuristicMode: HeuristicMode = 'euclidean'): Generator<AStarStep, void, unknown> {
   const { grid, start } = buildGrid(scene)
   const eps = scene.gridBounds.eps
+
+  yield { line: 0, action: 'find-start', current: { x: start.x, y: start.y }, heap: [] }
 
   start.distance = 0
   start.priority = 0
@@ -206,18 +215,21 @@ export function* aStarSteps(scene: Scene, searchAlg: SearchAlg = 'A-star'): Gene
           neighbor: neighborCoords, tentativeDistance, heap: heapSnapshot(visitQueue),
         }
 
-        neighbor.priority = computePriority(neighbor, scene.qGoal, searchAlg, expansionCounter)
+        neighbor.priority = computePriority(neighbor, scene.qGoal, searchAlg, expansionCounter, heuristicMode)
         expansionCounter++
+        const neighborHeuristic = heuristic(neighbor, scene.qGoal, heuristicMode)
         yield {
           line: 12, action: 'priority', current: { x: current.x, y: current.y },
-          neighbor: neighborCoords, neighborPriority: neighbor.priority, heap: heapSnapshot(visitQueue),
+          neighbor: neighborCoords, neighborPriority: neighbor.priority, neighborHeuristic,
+          tentativeDistance, heap: heapSnapshot(visitQueue),
         }
 
         neighbor.queued = true
         heapInsert(visitQueue, neighbor)
         yield {
           line: 13, action: 'enqueue', current: { x: current.x, y: current.y },
-          neighbor: neighborCoords, neighborPriority: neighbor.priority, heap: heapSnapshot(visitQueue),
+          neighbor: neighborCoords, neighborPriority: neighbor.priority, neighborHeuristic,
+          tentativeDistance, heap: heapSnapshot(visitQueue),
         }
       } else {
         yield {

@@ -7,6 +7,7 @@
 // "Algorithmic process" slide in slides.md keeps the original, fuller
 // wording rather than importing this file.
 export const astarPseudocode: string[] = [
+  'find the start node for the search from the q_init user parameter',
   'initialize the open queue with the start node (distance 0)',
   'while the open queue is not empty',
   '    pop the node with minimum priority from the open queue',

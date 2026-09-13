@@ -36,6 +36,7 @@
 /////     STUDENT HELPERS
 //////////////////////////////////////////////////
 
+// #region appendix-collision
 function testCollision(q) {
 
     var j;
@@ -60,6 +61,7 @@ function testCollision(q) {
     // return no collision, if no collision detected with any obstacle
     return false;
 }
+// #endregion appendix-collision
 
 function initRRT(q) {
 

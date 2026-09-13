@@ -1,6 +1,6 @@
 import { ref, computed, onBeforeUnmount, type Ref } from 'vue'
 import { aStarSteps, nodeKey as key } from './aStarSteps'
-import type { AStarStep, HeapEntry, Scene, SearchAlg } from './types'
+import type { AStarStep, HeapEntry, HeuristicMode, Scene, SearchAlg } from './types'
 
 interface TraceEntry {
   step: AStarStep
@@ -11,7 +11,7 @@ interface TraceEntry {
   path: { x: number; y: number }[]
 }
 
-function buildTrace(scene: Scene, alg: SearchAlg): TraceEntry[] {
+function buildTrace(scene: Scene, alg: SearchAlg, mode: HeuristicMode): TraceEntry[] {
   const trace: TraceEntry[] = []
   let visited = new Set<string>()
   let queued = new Set<string>()
@@ -19,7 +19,7 @@ function buildTrace(scene: Scene, alg: SearchAlg): TraceEntry[] {
   let edges = new Map<string, string>()
   let path: { x: number; y: number }[] = []
 
-  for (const step of aStarSteps(scene, alg)) {
+  for (const step of aStarSteps(scene, alg, mode)) {
     if (step.action === 'init' && step.current) {
       distances = new Map(distances)
       distances.set(key(step.current.x, step.current.y), 0)
@@ -60,13 +60,13 @@ function isInnerLoopLine(line: number): boolean {
   return line >= INNER_LOOP_MIN && line <= INNER_LOOP_MAX
 }
 
-// Every scene/algorithm combination is precomputed into a full trace, so
-// Play/Pause/Step Forward/Step Back/Reset are all just index navigation over
-// an array that already exists -- mirrors useSorter.ts's approach in the
-// sortingthespiderverse deck. Every pseudocode line gets its own trace
-// entry (see aStarSteps.ts), so stepping one entry at a time walks the
-// pseudocode one line at a time.
-export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<boolean> = ref(false)) {
+// Every scene/algorithm/heuristic combination is precomputed into a full
+// trace, so Play/Pause/Step Forward/Step Back/Reset are all just index
+// navigation over an array that already exists -- mirrors useSorter.ts's
+// approach in the sortingthespiderverse deck. Every pseudocode line gets
+// its own trace entry (see aStarSteps.ts), so stepping one entry at a time
+// walks the pseudocode one line at a time.
+export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<boolean> = ref(false), heuristicMode: Ref<HeuristicMode> = ref('euclidean')) {
   const activeLine = ref(-1)
   const visited = ref<Set<string>>(new Set())
   const queued = ref<Set<string>>(new Set())
@@ -76,6 +76,8 @@ export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<
   const currentNode = ref<{ x: number; y: number } | null>(null)
   const neighborNode = ref<{ x: number; y: number } | null>(null)
   const neighborPriority = ref<number | null>(null)
+  const neighborGScore = ref<number | null>(null)
+  const neighborHScore = ref<number | null>(null)
   const heap = ref<HeapEntry[]>([])
   const status = ref<'iterating' | 'succeeded' | 'failed' | 'idle'>('idle')
   const isRunning = ref(false)
@@ -102,6 +104,8 @@ export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<
       currentNode.value = null
       neighborNode.value = null
       neighborPriority.value = null
+      neighborGScore.value = null
+      neighborHScore.value = null
       heap.value = []
       status.value = 'idle'
       return
@@ -116,11 +120,13 @@ export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<
     currentNode.value = entry.step.current ?? null
     // neighborNode covers the whole lines 7-13 span for a given neighbor
     // (every step in that span carries a `neighbor`), so the neighbor cell
-    // stays highlighted throughout its consideration; neighborPriority is
-    // only set once it's actually computed (lines 12-13), which gates the
-    // full tentative-route line drawn back to start and out to the goal.
+    // stays highlighted throughout its consideration; the f/g/h scores are
+    // only set once they're actually computed (lines 12-13), which gates
+    // the full tentative-route line drawn back to start and out to the goal.
     neighborNode.value = entry.step.neighbor ?? null
     neighborPriority.value = entry.step.neighborPriority ?? null
+    neighborGScore.value = entry.step.tentativeDistance ?? null
+    neighborHScore.value = entry.step.neighborHeuristic ?? null
     heap.value = entry.step.heap
     if (entry.step.action === 'succeed') status.value = 'succeeded'
     else if (entry.step.action === 'fail') status.value = 'failed'
@@ -129,7 +135,7 @@ export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<
 
   function load(scene: Scene, alg: SearchAlg) {
     pause()
-    trace = buildTrace(scene, alg)
+    trace = buildTrace(scene, alg, heuristicMode.value)
     stepCount.value = trace.length
     applyPos(-1)
   }
@@ -184,7 +190,7 @@ export function useAStarTracer(speedMs: Ref<number> = ref(4), skipQueueing: Ref<
 
   return {
     activeLine, visited, queued, distances, edges, path, currentNode,
-    neighborNode, neighborPriority, heap, status,
+    neighborNode, neighborPriority, neighborGScore, neighborHScore, heap, status,
     isRunning, isDone, isAtStart, pos, stepCount, visitedCount, queuedCount,
     load, play, pause, reset, stepForward, stepBack,
   }
