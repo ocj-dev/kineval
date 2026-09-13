@@ -275,7 +275,7 @@ layout: default
 Four fields per cell are all the search needs: <code>distance</code> (cost of the cheapest path
 found so far), <code>parent</code> (the neighbor that path arrives from — this is what lets the
 search reconstruct a route at the end), <code>visited</code> (finalized, never revisited), and
-<code>priority</code> (what the open-queue heap sorts on).
+<code>priority</code> (what the open-queue heap sorts on).  Cells are stored in a 2D array <code>G</code> of references to individual cells, which also includes the (x,y) location of the cell center in map coordinates.
 </div>
 
 <<< ../reference/graph_search.js#grid-node-fields {*}{lines:true,startLine:64,maxHeight:'380px'}
@@ -288,8 +288,8 @@ layout: default
 
 <div class="panel text-xs mt-2">
 <code>q_init</code> generally won't land exactly on a grid point, so <code>initSearchGraph()</code>
-tracks the single closest grid node to it (line 0) while it builds the grid — the same
-double loop that lays out every cell's fields above also does this bookkeeping along the way.
+tracks the single closest grid node (with a reference in variable <code>closest_start_node</code>) to it while it builds the grid <code>G</code>.  The same
+double loop that initializes every cell fields in <code>G</code> also does this start cell identification along the way.
 </div>
 
 <<< ../reference/graph_search.js#find-start-cell {*}{lines:true,startLine:53,maxHeight:'420px'}
@@ -344,7 +344,7 @@ neighbor expansion begin.
 layout: default
 ---
 
-# Lines 2–6: the main loop
+# Lines 2–6: the main search loop
 
 <div class="panel text-xs mt-2">
 Each call to <code>iterateGraphSearch()</code> performs <i>one</i> queue-pop-and-visit step for the highest priority node in the <code>visit_queue</code>. Search terminal cases set <code>search_iterate = false</code> before returning when the search succeeds or fails to end further search iterations. Note, an explicit <code>while</code> loop here would block the execution of the web page and prevent drawing and user interface updates. This per-call structure returns control to the browser's animation loop after visiting a node: one call is one search iteration. 
@@ -356,7 +356,7 @@ Each call to <code>iterateGraphSearch()</code> performs <i>one</i> queue-pop-and
 layout: default
 ---
 
-# The admissible heuristic
+# The admissible heuristic: A-Star priority
 
 <div class="split-panel">
 <div class="panel text-sm">
@@ -383,7 +383,7 @@ to the goal. The Cul-de-Sac test case later in this deck shows exactly that happ
 <div class="side-image">
 <img src="/images/admissible-heuristic-diagram.png" alt="Diagram showing g(N), h(N), and h*(N) for a node N on a path from A to B around an obstacle, illustrating h(N) <= h*(N)" />
 </div>
-<div class="side-caption">Admissibility: h(N) never overestimates the true remaining cost h*(N). Widely used course-material diagram; original author unconfirmed.</div>
+<div class="side-caption">Admissibility: h(N) never overestimates the true remaining cost h*(N). Widely used course-material diagram; <a href="https://x.com/AlanZucconi/status/1347527171762434052/photo/1">original author unconfirmed</a>.</div>
 </div>
 </div>
 
