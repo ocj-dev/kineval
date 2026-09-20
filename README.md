@@ -20,6 +20,7 @@ reference code lives alongside its deck at `<topic>/reference/`.
 | Topic | Directory | Status |
 |---|---|---|
 | A-star path planning | [`pathfinding/`](pathfinding/) | Built |
+| 2D cloth simulation | [`cloth_simulation/`](cloth_simulation/) | Built |
 | Pendularm dynamical simulation | [`simulation/`](simulation/) | Planned |
 | Forward kinematics & quaternions | [`forward_kinematics/`](forward_kinematics/) | Planned |
 | Inverse kinematics & optimization | [`inverse_kinematics/`](inverse_kinematics/) | Planned |

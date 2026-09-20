@@ -1,0 +1,138 @@
+<!--|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    2D Cloth Simulation in HTML5 Canvas | Main HTML File
+
+    COMPLETED REFERENCE IMPLEMENTATION for the AutoRob (autorob.org) lab-session
+    slides. Implements maximal-coordinate, constraint-based physical simulation
+    of a 2D cloth: force accumulation, Verlet integration, and satisfying
+    multiple concurrent constraints by iterated relaxation, following:
+
+      Thomas Jakobsen, "Advanced Character Physics"
+      https://graphics.cs.cmu.edu/nsp/course/15-869/2006/papers/jakobsen.htm
+
+    parameterized as an extension of:
+
+      Adam Brooks, "Tearable Cloth"
+      demo: https://codepen.io/dissimulate/pen/nYQrNP
+      repo: https://github.com/dissimulate/Tearable-Cloth
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+    Usage: the simulation will start upon browser loading this file, with
+      execution parameters specifying:
+
+      accuracy: integer number of constraint-relaxation passes per frame
+      gravity: downward acceleration applied to every free node
+      cloth_x, cloth_y: integer grid dimensions of the cloth, in nodes
+      spacing: pixel distance between adjacent node centers
+      tear: boolean, whether constraints break when overstretched
+      tear_dist: pixel distance beyond which a stretched constraint breaks
+        (only relevant when tear=true)
+      friction: Verlet velocity damping factor, applied every integration step
+      bounce: restitution used when a node collides with a canvas wall or
+        ground plane
+      node_type: "particle" or "rigid" -- whether cloth nodes are point
+        particles or rigid squares linked at their corners
+      stiffness: 0-1 scale on the correction applied during each relaxation
+        pass, for both distance and corner constraints
+      michigan_colors: boolean, whether nodes are tinted maize/blue in a
+        block-M pattern
+      wind: 2-element [x,y] array, a constant force added while non-zero
+
+    these parameters can be specified in the URL as parameter assignments
+    separated by question marks, as in the following example:
+
+      cloth_canvas.html?node_type=rigid?tear=true?wind=[3,0]?stiffness=0.6
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\-->
+
+
+<html>
+
+  <script src="physics.js"></script>
+  <script src="cloth.js"></script>
+  <script src="infrastructure.js"></script>
+  <script src="draw.js"></script>
+
+  <body onload="init()">
+
+    <p style="font-family:monospace;font-size:14">2D Cloth Simulation &mdash; AutoRob KinEval reference implementation</p>
+
+    <canvas id="myCanvas" width=900 height=700 style="z-index: 10; border:1px solid #000000; background:#f2efe9;">
+    </canvas>
+
+    <p style="font-family:monospace;font-size:12">
+      Drag with the mouse to pull the cloth; right-click (or secondary button) near a node to cut its constraints directly (independent of the <code>tear</code> parameter, which instead breaks overstretched constraints automatically).
+      Credit: simulation approach from Thomas Jakobsen's
+      <a href="https://graphics.cs.cmu.edu/nsp/course/15-869/2006/papers/jakobsen.htm" target="_blank">"Advanced Character Physics"</a>,
+      parameterization from Adam Brooks'
+      <a href="https://github.com/dissimulate/Tearable-Cloth" target="_blank">Tearable Cloth</a>.
+    </p>
+
+    <script>
+      <!-- #region appendix-url-params -->
+      // Default number of constraint-relaxation passes per frame
+      accuracy = 4;
+
+      // Default downward acceleration
+      gravity = 0.4;
+
+      // Default cloth grid size, in nodes
+      cloth_x = 20;
+      cloth_y = 14;
+
+      // Default spacing between adjacent node centers, in pixels
+      spacing = 22;
+
+      // Default tearing behavior
+      tear = false;
+      tear_dist = spacing * 3;
+
+      // Default Verlet damping and collision restitution
+      friction = 0.98;
+      bounce = 0.5;
+
+      // Default node type: "particle" or "rigid"
+      node_type = "particle";
+
+      // Default constraint-relaxation stiffness (0-1)
+      stiffness = 1.0;
+
+      // Default Michigan block-M node coloring
+      michigan_colors = true;
+
+      // Default wind force [x,y], off by default
+      wind = [0, 0];
+
+      // Parse user input
+      var url_parsed = window.location.href.split("?");
+      for (i = 1; i < url_parsed.length; i++) {
+          var param_parsed = url_parsed[i].split("=");
+          if (param_parsed[0] !== "node_type") {
+              eval(param_parsed[0] + "=" + param_parsed[1]);
+          } else {
+              eval(param_parsed[0] + "=\'" + param_parsed[1] + "\'");
+          }
+      }
+
+      // derived globals used throughout physics.js/cloth.js
+      tear_enabled = tear;
+      gravity_enabled = true;
+      wind_enabled = (wind[0] !== 0 || wind[1] !== 0);
+      <!-- #endregion appendix-url-params -->
+    </script>
+  </body>
+</html>
