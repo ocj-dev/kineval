@@ -31,6 +31,50 @@ window.requestAnimFrame =
     window.mozRequestAnimationFrame ||
     function (callback) { window.setTimeout(callback, 1000 / 60); };
 
+// #region draw-arrow
+// Shared vector-arrow primitive (drawn with plain canvas path/line calls,
+// no images) used for the wind indicator below, and mirrored in the slides
+// deck's drawUtils.ts for the same visual language there.
+function drawArrow(x1, y1, x2, y2, color) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1) return;
+    var ux = dx / len, uy = dy / len;
+    var head = Math.min(10, len * 0.4);
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    var leftx = x2 - head * (ux * 0.866 + uy * 0.5);
+    var lefty = y2 - head * (uy * 0.866 - ux * 0.5);
+    var rightx = x2 - head * (ux * 0.866 - uy * 0.5);
+    var righty = y2 - head * (uy * 0.866 + ux * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(leftx, lefty);
+    ctx.lineTo(rightx, righty);
+    ctx.closePath();
+    ctx.fill();
+}
+// #endregion draw-arrow
+
+// #region draw-wind-indicator
+// A fixed indicator (top-left corner) of the current gusting wind vector
+// from physics.js's currentWind() -- drawn every frame it's non-zero, using
+// the same drawArrow() primitive as every other vector in this module.
+function drawWindIndicator() {
+    if (!wind_enabled) return;
+    var w = currentWind();
+    var ox = 50, oy = 50, scale = 8;
+    drawArrow(ox, oy, ox + w.x * scale, oy + w.y * scale, '#1a9e6b');
+}
+// #endregion draw-wind-indicator
+
 // #region draw-particle-cloth
 function drawParticleCloth() {
 
@@ -93,6 +137,7 @@ function draw() {
     if (node_type === 'rigid') drawRigidCloth();
     else drawParticleCloth();
     drawGroundPlanes();
+    drawWindIndicator();
 }
 
 // #region appendix-animate

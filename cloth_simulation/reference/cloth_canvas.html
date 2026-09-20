@@ -67,14 +67,14 @@
   <script src="infrastructure.js"></script>
   <script src="draw.js"></script>
 
-  <body onload="init()">
+  <body onload="init()" style="margin:0; display:flex; flex-direction:column; height:100vh; box-sizing:border-box;">
 
-    <p style="font-family:monospace;font-size:14">2D Cloth Simulation &mdash; AutoRob KinEval reference implementation</p>
+    <p style="font-family:monospace;font-size:13px; margin:0.4em 0.6em;">2D Cloth Simulation &mdash; AutoRob KinEval reference implementation</p>
 
-    <canvas id="myCanvas" width=900 height=700 style="z-index: 10; border:1px solid #000000; background:#f2efe9;">
+    <canvas id="myCanvas" style="z-index: 10; border:1px solid #000000; background:#f2efe9; flex:1 1 auto; min-height:0; width:100%; display:block;">
     </canvas>
 
-    <p style="font-family:monospace;font-size:12">
+    <p style="font-family:monospace;font-size:11px; margin:0.4em 0.6em;">
       Drag with the mouse to pull the cloth; right-click (or secondary button) near a node to cut its constraints directly (independent of the <code>tear</code> parameter, which instead breaks overstretched constraints automatically).
       Credit: simulation approach from Thomas Jakobsen's
       <a href="https://graphics.cs.cmu.edu/nsp/course/15-869/2006/papers/jakobsen.htm" target="_blank">"Advanced Character Physics"</a>,
@@ -108,8 +108,10 @@
       // Default node type: "particle" or "rigid"
       node_type = "particle";
 
-      // Default constraint-relaxation stiffness (0-1)
-      stiffness = 1.0;
+      // Default constraint-relaxation stiffness (0-1) -- low stiffness is
+      // the default so the cloth's give is visible out of the box; pass
+      // ?stiffness=1.0 for a stiffer, less stretchy cloth.
+      stiffness = 0.25;
 
       // Default Michigan block-M node coloring
       michigan_colors = true;

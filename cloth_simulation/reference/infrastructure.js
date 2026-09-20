@@ -34,12 +34,13 @@ function init() {
 
     canvas = document.getElementById('myCanvas');
     ctx = canvas.getContext('2d');
-    canvas_width = canvas.width;
-    canvas_height = canvas.height;
 
-    var b_rect = canvas.getBoundingClientRect();
-    canvas_side_off = b_rect.left;
-    canvas_top_off = b_rect.top;
+    // the canvas element itself is laid out by CSS to fill the available
+    // page/embedding space (see cloth_canvas.html's flex layout), so its
+    // drawing-buffer resolution is read from -- and kept in sync with --
+    // its actual rendered size, rather than a fixed width/height attribute
+    resizeCanvasToContainer();
+    window.onresize = resizeCanvasToContainer;
 
     // no ground plane by default; scenes (e.g. the blob-simulation slide
     // demo) can push an additional horizontal boundary onto this array
@@ -51,6 +52,17 @@ function init() {
     cur_time = Date.now();
     animate();
 }
+
+// #region resize-canvas
+function resizeCanvasToContainer() {
+    canvas_width = canvas.width = canvas.clientWidth;
+    canvas_height = canvas.height = canvas.clientHeight;
+
+    var b_rect = canvas.getBoundingClientRect();
+    canvas_side_off = b_rect.left;
+    canvas_top_off = b_rect.top;
+}
+// #endregion resize-canvas
 
 function initCloth() {
     cloth = new Cloth();

@@ -56,11 +56,49 @@ function isMichiganM(u, v) {
     return false;
 }
 
+// natural width:height ratio of the block-M glyph above, used to letterbox
+// it into a non-square grid without distorting it
+var MICHIGAN_M_ASPECT = 1.15;
+
+// smallest inner (post-buffer) grid size, in nodes along each axis, at which
+// the M is still legible; below this the grid is too small to maintain its
+// proportions, so nodes fall back to a plain background fill instead
+var MICHIGAN_M_MIN_INNER = 5;
+
 function nodeColor(col, row) {
     if (!michigan_colors) return DEFAULT_NODE_COLOR;
-    var u = (cloth_x > 1) ? col / (cloth_x - 1) : 0;
-    var v = (cloth_y > 1) ? row / (cloth_y - 1) : 0;
-    return isMichiganM(u, v) ? MICHIGAN_BLUE : MICHIGAN_MAIZE;
+
+    // reserve at least a 1-node buffer around the M on every side
+    var margin = 1;
+    var inner_w = cloth_x - 2 * margin;
+    var inner_h = cloth_y - 2 * margin;
+
+    if (inner_w < MICHIGAN_M_MIN_INNER || inner_h < MICHIGAN_M_MIN_INNER)
+        return MICHIGAN_BLUE;   // too small to keep the M in proportion -- solid background instead
+
+    if (col < margin || col >= cloth_x - margin || row < margin || row >= cloth_y - margin)
+        return MICHIGAN_BLUE;   // inside the buffer border
+
+    var u = (col - margin) / (inner_w - 1);
+    var v = (row - margin) / (inner_h - 1);
+
+    // letterbox u,v into the M's own aspect ratio so it never stretches to
+    // fill a wide/tall grid -- the smaller-than-the-box axis gets padded
+    // (rendered as background) on both sides instead
+    var inner_aspect = inner_w / inner_h;
+    var u_m = u, v_m = v;
+    if (inner_aspect > MICHIGAN_M_ASPECT) {
+        var scale_x = MICHIGAN_M_ASPECT / inner_aspect;
+        u_m = 0.5 + (u - 0.5) / scale_x;
+    } else {
+        var scale_y = inner_aspect / MICHIGAN_M_ASPECT;
+        v_m = 0.5 + (v - 0.5) / scale_y;
+    }
+    if (u_m < 0 || u_m > 1 || v_m < 0 || v_m > 1) return MICHIGAN_BLUE;
+
+    // colors inverted from a literal reading: the M glyph itself is maize,
+    // the surrounding field (buffer, letterbox padding, and background) is blue
+    return isMichiganM(u_m, v_m) ? MICHIGAN_MAIZE : MICHIGAN_BLUE;
 }
 // #endregion michigan-mask
 
@@ -90,7 +128,9 @@ function Cloth() {
             var node;
 
             if (node_type === 'rigid') {
-                node = new RigidSquare(x, y, (spacing - 1) / 2);
+                // squares fill 75% of the grid spacing (side = 0.75*spacing),
+                // leaving a 25% gap between adjacent squares
+                node = new RigidSquare(x, y, spacing * 0.75 / 2);
             } else {
                 node = new Particle(x, y);
                 node.mass = 1;

@@ -6,20 +6,24 @@ import { MASTER_PSEUDOCODE, LINE_ACCUMULATE, LINE_INTEGRATE, LINE_RELAX } from '
 import { makeRigid, verletIntegrateRigid, satisfyConstraintRigid, worldCorner, type RigidState, type Vec2 } from '../lib/cloth/clothPhysics'
 import { drawArrow, drawRigidSquare } from '../lib/cloth/drawUtils'
 
-const WIDTH = 380, HEIGHT = 240
+const WIDTH = 380, HEIGHT = 260
 const GRAVITY = 0.5
-const FRICTION = 0.97
-// exception, per the deck's sizing rule: this standalone two-square demo is
-// not part of a grid, so it keeps its own fixed size rather than the
-// grid's 75%-of-spacing scaling
+const FRICTION = 0.975
+// same non-grid exception as ConstraintRigidPanel
 const HALF = 26
+const SIDE = 2 * HALF
+const REST_LENGTH = 2 * SIDE   // rest length = 2x the square's side length, per spec
 
 type Phase = 'accumulate' | 'integrate' | 'relax'
 interface Entry { frame: number; phase: Phase; bodyA: RigidState; bodyB: RigidState; vectors: { from: Vec2; to: Vec2; color: string }[] }
 
-let bodyA: RigidState = makeRigid(140, 60, HALF, true)
-let bodyB: RigidState = makeRigid(230, 110, HALF, false)
-bodyB.theta = 0.5
+function initial() {
+  const a = makeRigid(120, 50, HALF, true)
+  const b = makeRigid(230, 150, HALF, false)
+  b.theta = 0.2
+  return { a, b }
+}
+let { a: bodyA, b: bodyB } = initial()
 let frameCount = 0
 
 function generateFrame(): Entry[] {
@@ -32,34 +36,28 @@ function generateFrame(): Entry[] {
   verletIntegrateRigid(bodyB, FRICTION)
   entries.push({ frame: frameCount, phase: 'integrate', bodyA: { ...bodyA }, bodyB: { ...bodyB }, vectors: [forceVec] })
 
-  const beforeA1 = worldCorner(bodyA, 1), beforeA2 = worldCorner(bodyA, 2)
-  const c1 = satisfyConstraintRigid(bodyA, 1, bodyB, 0, 1.0)
-  const c2 = satisfyConstraintRigid(bodyA, 2, bodyB, 3, 1.0)
+  // a SINGLE constraint (not 2) between the bottom-right corners (index 2),
+  // with a nonzero rest length -- so unlike the shared-edge rigid weld, both
+  // squares remain free to rotate about this one connection point
+  const before = worldCorner(bodyA, 2)
+  const c = satisfyConstraintRigid(bodyA, 2, bodyB, 2, 1.0, REST_LENGTH)
   entries.push({
     frame: frameCount, phase: 'relax', bodyA: { ...bodyA }, bodyB: { ...bodyB },
-    vectors: [
-      { from: beforeA1, to: { x: beforeA1.x + c1.x, y: beforeA1.y + c1.y }, color: '#FFCB05' },
-      { from: beforeA2, to: { x: beforeA2.x + c2.x, y: beforeA2.y + c2.y }, color: '#FFCB05' },
-    ],
+    vectors: [{ from: before, to: { x: before.x + c.x, y: before.y + c.y }, color: '#FFCB05' }],
   })
 
   frameCount++
   return entries
 }
 
-function resetSim() {
-  bodyA = makeRigid(140, 60, HALF, true)
-  bodyB = makeRigid(230, 110, HALF, false)
-  bodyB.theta = 0.5
-  frameCount = 0
-}
+function resetSim() { ({ a: bodyA, b: bodyB } = initial()); frameCount = 0 }
 
 const tracer = usePhaseTracer<Entry>(generateFrame, resetSim)
 const { current, trace, pos } = tracer
 
 const activeLineFor: Record<Phase, number> = { accumulate: LINE_ACCUMULATE, integrate: LINE_INTEGRATE, relax: LINE_RELAX }
 const labelFor: Record<Phase, string> = {
-  accumulate: 'Accumulate forces', integrate: 'Verlet integrate (pos + orientation)', relax: 'Satisfy 2 corner constraints (relax)',
+  accumulate: 'Accumulate forces', integrate: 'Verlet integrate (pos + orientation)', relax: 'Satisfy 1 corner constraint (relax)',
 }
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -99,9 +97,8 @@ watch(current, render)
       <canvas ref="canvasRef" :width="WIDTH" :height="HEIGHT" />
     </div>
     <div class="legend">
-      <span><i style="background:#00274C" /> anchor square (fixed position + orientation)</span>
-      <span v-if="current.phase === 'relax'"><i style="background:#FFCB05" /> corner corrections (2 constraints)</span>
-      <span v-else><i style="background:#00274C" /> gravity force</span>
+      <span><i style="background:#00274C" /> anchor square</span>
+      <span>single constraint, bottom-right corners, rest length = 2&times; side</span>
     </div>
   </PhaseStepperShell>
 </template>

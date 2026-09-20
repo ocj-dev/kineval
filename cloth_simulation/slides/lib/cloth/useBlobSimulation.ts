@@ -8,27 +8,20 @@ const GRAVITY = 0.55
 const FRICTION = 0.985
 const ACCURACY = 5
 const STIFFNESS = 1.0
+const DRAG_PICK_RADIUS = 28
 
 export interface BlobConstraint { i: number; j: number; rest: number }
 
 // Five unanchored particles at the corners of a pentagon, fully connected
 // (every pair gets a distance constraint -- 5 choose 2 = 10 constraints),
 // falling under gravity onto a ground plane inside the panel's own walls.
-// Unlike the constraint-example tracers above, this runs live (Play/Pause
-// advance real frames rather than replaying a precomputed trace) since the
-// point here is watching the whole system settle, not single pseudocode lines.
 export function useBlobSimulation(width: number, height: number) {
 
   const centerX = width / 2, centerY = height * 0.38, radius = 46
-  let particles: ParticleState[] = []
-  let constraints: BlobConstraint[] = []
+  const particles: ParticleState[] = []
+  const constraints: BlobConstraint[] = []
   const groundY = height - 24
 
-  // mutate the arrays in place (length = 0, then push) rather than
-  // reassigning `particles`/`constraints` -- the object returned below
-  // captures a reference to these two arrays once, at composable-creation
-  // time, so reset() must keep writing into that same reference rather than
-  // pointing the local variable at a brand-new array the caller never sees.
   function build() {
     particles.length = 0
     for (let k = 0; k < 5; k++) {
@@ -47,7 +40,42 @@ export function useBlobSimulation(width: number, height: number) {
 
   const tick_count = ref(0)
   const isRunning = ref(false)
-  let raf = 0
+  const smooth = ref(true)
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  // #region mouse-drag-constraint
+  // While the mouse is down near a node, that node is pinned directly to
+  // the mouse position every frame -- an (infinitely) stiff location
+  // constraint -- rather than nudged like the reference implementation's
+  // velocity-imparting drag. Releasing un-pins it and zeroes its implicit
+  // Verlet velocity so it doesn't snap away from wherever it was dropped.
+  const dragIndex = ref(-1)
+
+  function mouseDown(x: number, y: number) {
+    let best = -1, bestDist = DRAG_PICK_RADIUS
+    particles.forEach((p, i) => {
+      const d = Math.hypot(p.x - x, p.y - y)
+      if (d < bestDist) { bestDist = d; best = i }
+    })
+    if (best >= 0) {
+      dragIndex.value = best
+      particles[best].pinned = true
+      particles[best].x = x; particles[best].y = y
+    }
+  }
+  function mouseMove(x: number, y: number) {
+    if (dragIndex.value < 0) return
+    const p = particles[dragIndex.value]
+    p.x = x; p.y = y
+  }
+  function mouseUp() {
+    if (dragIndex.value < 0) return
+    const p = particles[dragIndex.value]
+    p.pinned = false
+    p.px = p.x; p.py = p.y
+    dragIndex.value = -1
+  }
+  // #endregion mouse-drag-constraint
 
   function stepFrame() {
     for (const p of particles) {
@@ -62,17 +90,19 @@ export function useBlobSimulation(width: number, height: number) {
     tick_count.value++
   }
 
-  function loop() {
+  function tick() {
     stepFrame()
-    if (isRunning.value) raf = requestAnimationFrame(loop)
+    if (isRunning.value) timer = setTimeout(tick, smooth.value ? 16 : 300)
   }
-
-  function play() { if (isRunning.value) return; isRunning.value = true; raf = requestAnimationFrame(loop) }
-  function pause() { isRunning.value = false; cancelAnimationFrame(raf) }
-  function reset() { pause(); build(); tick_count.value = 0 }
+  function play() { if (isRunning.value) return; isRunning.value = true; timer = setTimeout(tick, smooth.value ? 16 : 300) }
+  function pause() { isRunning.value = false; if (timer) { clearTimeout(timer); timer = null } }
+  function reset() { pause(); dragIndex.value = -1; build(); tick_count.value = 0 }
   function stepOnce() { if (!isRunning.value) stepFrame() }
 
-  onBeforeUnmount(() => cancelAnimationFrame(raf))
+  onBeforeUnmount(() => pause())
 
-  return { particles, constraints, groundY, tick_count, isRunning, play, pause, reset, stepOnce }
+  return {
+    particles, constraints, groundY, tick_count, isRunning, smooth,
+    play, pause, reset, stepOnce, mouseDown, mouseMove, mouseUp, dragIndex,
+  }
 }

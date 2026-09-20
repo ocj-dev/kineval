@@ -48,11 +48,31 @@ function Particle(x, y) {
     this.constraints = [];    // Constraint objects touching this particle
 }
 
+// #region wind-time-varying
+// A "windy flag" should feel like weather, not a fan: the configured `wind`
+// URL parameter is treated as a base magnitude/direction that gusts and
+// shifts over time, rather than a constant force. `sim_time` is a frame
+// counter advanced once per simulateStep() call.
+var sim_time = 0;
+
+function currentWind() {
+    if (!wind_enabled) return { x: 0, y: 0 };
+
+    var base_mag = Math.sqrt(wind[0] * wind[0] + wind[1] * wind[1]);
+    var base_angle = Math.atan2(wind[1], wind[0]);
+
+    var gust_mag = base_mag * (0.6 + 0.4 * Math.sin(sim_time * 0.025));
+    var gust_angle = base_angle + 0.35 * Math.sin(sim_time * 0.013);
+
+    return { x: gust_mag * Math.cos(gust_angle), y: gust_mag * Math.sin(gust_angle) };
+}
+// #endregion wind-time-varying
+
 // #region accumulate-forces
 // Newton's Second Law: force accumulates on a node each timestep. Gravity is
-// a fixed downward force; wind is a uniform vector added while it's enabled;
-// the mouse "influence" drag also enters here, as a spring-like pull toward
-// the cursor.
+// a fixed downward force; wind is a uniform (but, per currentWind() above,
+// gusting) vector added while it's enabled; the mouse "influence" drag also
+// enters here, as a spring-like pull toward the cursor.
 function accumulateForces(node) {
 
     node.force_x = 0;
@@ -62,8 +82,9 @@ function accumulateForces(node) {
         node.force_y += gravity * node.mass;
 
     if (wind_enabled) {
-        node.force_x += wind[0];
-        node.force_y += wind[1];
+        var w = currentWind();
+        node.force_x += w.x;
+        node.force_y += w.y;
     }
 }
 // #endregion accumulate-forces
@@ -214,11 +235,17 @@ function verletIntegrateRigid(body, dt) {
 }
 // #endregion verlet-integrate-rigid
 
-function CornerConstraint(bodyA, cornerA, bodyB, cornerB) {
+function CornerConstraint(bodyA, cornerA, bodyB, cornerB, rest_length) {
     this.bodyA = bodyA;
     this.cornerA = cornerA;
     this.bodyB = bodyB;
     this.cornerB = cornerB;
+    // rest_length defaults to 0 (coincidence) -- the shared-edge grid case.
+    // A single corner-to-corner constraint with a nonzero rest_length instead
+    // behaves like a rigid-body "rope": it holds the two corners a fixed
+    // distance apart but, unlike two coincidence constraints along a shared
+    // edge, doesn't by itself prevent either body from rotating about it.
+    this.rest_length = (rest_length !== undefined) ? rest_length : 0;
     this.active = true;
     bodyA.corner_constraints.push(this);
     bodyB.corner_constraints.push(this);
@@ -266,10 +293,13 @@ function applyCornerCorrection(body, corner_index, dx, dy) {
 
 // #region satisfy-constraint-rigid
 // The rigid-body analog of satisfyConstraintParticle(): two corners (one on
-// each of two adjacent squares) are relaxed toward coincidence -- rest
-// distance zero -- instead of toward a fixed spacing. Two of these per shared
-// edge (one on each end) is what keeps neighboring squares from hinging
-// freely about a single point.
+// each of two squares) are relaxed toward being cc.rest_length apart, using
+// exactly the same (dist - rest_length)/dist relaxation math as the particle
+// constraint. For the grid's shared-edge corner pairs, rest_length is 0
+// (coincidence); two of those per shared edge is what keeps neighboring
+// squares from hinging freely about a single point. A single constraint with
+// a nonzero rest_length, by contrast, still lets both squares rotate freely
+// about it, like a rope between two corners.
 function satisfyConstraintRigid(cc) {
 
     if (!cc.active) return;
@@ -282,9 +312,11 @@ function satisfyConstraintRigid(cc) {
         cc.active = false;
         return;
     }
+    if (dist === 0) return;
 
-    var dx = (wb.x - wa.x) * 0.5 * stiffness;
-    var dy = (wb.y - wa.y) * 0.5 * stiffness;
+    var diff = (dist - cc.rest_length) / dist;
+    var dx = (wb.x - wa.x) * 0.5 * diff * stiffness;
+    var dy = (wb.y - wa.y) * 0.5 * diff * stiffness;
 
     applyCornerCorrection(cc.bodyA, cc.cornerA, dx, dy);
     applyCornerCorrection(cc.bodyB, cc.cornerB, -dx, -dy);
@@ -392,6 +424,7 @@ function satisfyCollisionsRigid(body) {
 function simulateStep(dt) {
 
     var i, node;
+    sim_time++;
 
     for (i = 0; i < cloth.nodes.length; i++) {
         node = cloth.nodes[i];

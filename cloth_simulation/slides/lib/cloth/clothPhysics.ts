@@ -149,13 +149,20 @@ export function applyCornerCorrection(body: RigidState, corner_index: number, dx
 // #endregion demo-apply-corner-correction
 
 // #region demo-satisfy-rigid
+// restLength defaults to 0 (coincidence, the shared-edge grid case). A
+// single corner-to-corner constraint with a nonzero restLength instead
+// behaves like a rope between two corners: it holds them a fixed distance
+// apart without, by itself, preventing either body from rotating about it.
 export function satisfyConstraintRigid(
   bodyA: RigidState, cornerA: number, bodyB: RigidState, cornerB: number, stiffness: number,
+  restLength = 0,
 ): Vec2 {
   const wa = worldCorner(bodyA, cornerA)
   const wb = worldCorner(bodyB, cornerB)
-  const dx = (wb.x - wa.x) * 0.5 * stiffness
-  const dy = (wb.y - wa.y) * 0.5 * stiffness
+  const dist = Math.sqrt((wb.x - wa.x) ** 2 + (wb.y - wa.y) ** 2) || 1e-9
+  const diff = (dist - restLength) / dist
+  const dx = (wb.x - wa.x) * 0.5 * diff * stiffness
+  const dy = (wb.y - wa.y) * 0.5 * diff * stiffness
   applyCornerCorrection(bodyA, cornerA, dx, dy)
   applyCornerCorrection(bodyB, cornerB, -dx, -dy)
   return { x: dx, y: dy }

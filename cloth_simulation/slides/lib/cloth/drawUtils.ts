@@ -4,7 +4,7 @@
 
 export function drawArrow(
   ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number,
-  color: string, width = 2.5,
+  color: string, width = 3,
 ) {
   const dx = x2 - x1, dy = y2 - y1
   const len = Math.sqrt(dx * dx + dy * dy)

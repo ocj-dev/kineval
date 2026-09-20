@@ -60,6 +60,13 @@ constraints, and that those constraints could be **satisfied by iterated relaxat
 solved as a stiff system of equations. The result ran fast enough for real-time games and is still
 numerically stable even when badly overstretched or torn.
 
+Around the same time, Russell Smith's [Open Dynamics Engine](https://www.ode.org/) (ODE, first
+released 2001) took the opposite route to a similar goal: general rigid-body simulation via
+Lagrange-multiplier constraint forces, solved as a linear complementarity problem each step,
+rather than positional relaxation. ODE became a standard physics backend for early game engines
+and robotics simulators alike -- the same problem, two different constraint-solving philosophies,
+both still very much in use today.
+
 This module's reference implementation extends that same approach with an alternative rigid-square
 node type integrated via the **Newton-Euler equations of motion**, following Adam Brooks'
 ["Tearable Cloth"](https://github.com/dissimulate/Tearable-Cloth) for its concrete
@@ -106,8 +113,9 @@ iterations just mean a softer, springier result instead of a diverging solve.
 <b>Note on collision, ahead</b>
 This deck's cloth also collides with the canvas walls and any ground plane -- handled the same way
 as every other constraint, by relaxation, alongside the distance/corner constraints. General
-collision detection (self-collision, arbitrary obstacle geometry) is out of scope; see the
-concluding slide.
+collision detection (cloth self-collision, cloth-object contact, arbitrary obstacle geometry) is
+deliberately out of scope; simulators like Genesis (closing slide) build on this same
+maximal-coordinate, constraint-based lineage at that much larger scale.
 </div>
 
 ---
@@ -132,9 +140,9 @@ Every run is configured entirely through URL parameters, extending Tearable Clot
 | `friction` | number (default `0.98`) | Verlet velocity damping |
 | `bounce` | number (default `0.5`) | restitution on wall/ground collision |
 | `node_type` | `particle`\|`rigid` (default `particle`) | point particles, or rigid squares linked at corners |
-| `stiffness` | 0&ndash;1 (default `1.0`) | scale on each relaxation pass's correction |
+| `stiffness` | 0&ndash;1 (default `0.25`) | scale on each relaxation pass's correction |
 | `michigan_colors` | `true`\|`false` (default `true`) | maize/blue block-M node coloring |
-| `wind` | `[x,y]` (default `[0,0]`) | constant wind force |
+| `wind` | `[x,y]` (default `[0,0]`) | base wind force -- gusts in magnitude/direction over time when non-zero |
 
 ```text
 cloth_canvas.html
@@ -203,9 +211,10 @@ a single particle up to the full grid:
 2. **Single rigid square** -- the same, plus Euler's rotation equation for orientation
 3. **Single constraint** (particle) -- accumulate/integrate/relax, one node anchored
 4. **Single constraint** (rigid) -- the same, with 2 corner constraints, position+orientation anchored
-5. **Single constraint with collision** -- a 4th phase, against a wall/ground boundary
-6. **Blob simulation** -- 5 unanchored particles, full connectivity, ground plane
-7. **3&times;3 cloth grid** -- particle and rigid variants, side by side
+5. **A single constraint instead of two** -- one corner-to-corner "rope" constraint, free to rotate
+6. **Single constraint with collision** -- a 4th phase, against a wall/ground boundary
+7. **Blob simulation** -- 5 unanchored particles, full connectivity, ground plane, mouse dragging
+8. **3&times;3 cloth grid** -- particle and rigid variants, side by side, mouse dragging
 
 Every code snippet is imported directly from the shipped reference files -- not retyped -- with
 line numbers matching those files exactly. An appendix at the end of this deck covers the
@@ -242,8 +251,8 @@ are the same number), then Verlet-integrates: the previous-position-difference s
 velocity, damped by <code>friction</code>, plus the new acceleration.
 </div>
 
-<<< ../reference/physics.js#accumulate-forces {*}{lines:true,startLine:52,maxHeight:'220px'}
-<<< ../reference/physics.js#verlet-integrate-particle {*}{lines:true,startLine:72,maxHeight:'220px'}
+<<< ../reference/physics.js#accumulate-forces {*}{lines:true,startLine:72,maxHeight:'220px'}
+<<< ../reference/physics.js#verlet-integrate-particle {*}{lines:true,startLine:93,maxHeight:'220px'}
 
 ---
 layout: default
@@ -276,8 +285,8 @@ inertia axis are perpendicular to the plane of motion), leaving the scalar speci
 position is, with <code>theta</code>/<code>ptheta</code> standing in for <code>x</code>/<code>px</code>.
 </div>
 
-<<< ../reference/physics.js#accumulate-torque {*}{lines:true,startLine:180,maxHeight:'200px'}
-<<< ../reference/physics.js#verlet-integrate-rigid {*}{lines:true,startLine:194,maxHeight:'220px'}
+<<< ../reference/physics.js#accumulate-torque {*}{lines:true,startLine:201,maxHeight:'200px'}
+<<< ../reference/physics.js#verlet-integrate-rigid {*}{lines:true,startLine:215,maxHeight:'220px'}
 
 ---
 layout: default
@@ -311,7 +320,7 @@ times per frame, <i>is</i> "solving multiple concurrent constraints by relaxatio
 system is ever assembled.
 </div>
 
-<<< ../reference/physics.js#satisfy-constraint-particle {*}{lines:true,startLine:107,maxHeight:'420px'}
+<<< ../reference/physics.js#satisfy-constraint-particle {*}{lines:true,startLine:128,maxHeight:'420px'}
 
 ---
 layout: default
@@ -345,7 +354,7 @@ either source material, since Jakobsen's own paper represents rigid bodies with 
 particles instead.
 </div>
 
-<<< ../reference/physics.js#apply-corner-correction {*}{lines:true,startLine:228,maxHeight:'420px'}
+<<< ../reference/physics.js#apply-corner-correction {*}{lines:true,startLine:255,maxHeight:'420px'}
 
 ---
 layout: default
@@ -359,7 +368,26 @@ keeps neighboring squares from hinging freely about a single point, the same way
 wires up every adjacent pair in the full grid.
 </div>
 
-<<< ../reference/physics.js#satisfy-constraint-rigid {*}{lines:true,startLine:268,maxHeight:'380px'}
+<<< ../reference/physics.js#satisfy-constraint-rigid {*}{lines:true,startLine:295,maxHeight:'380px'}
+
+---
+layout: default
+---
+
+# One constraint instead of two: a rope, not a weld
+
+<div class="content-body">
+<ConstraintRigidRopePanel />
+</div>
+
+<!--
+Same satisfyConstraintRigid() shown on the previous slide, but called once
+(not twice) between the two squares' bottom-right corners, with a nonzero
+rest length (2x the square's side) instead of 0. With only one constraint,
+bodyB is free to swing and rotate about that single point -- contrast with
+the 2-corner "weld" a couple slides back, which fully locks relative
+orientation between adjacent squares.
+-->
 
 ---
 layout: default
@@ -393,7 +421,7 @@ system, and not only once per frame -- so a fast-moving node can't tunnel throug
 between one <code>accuracy</code> iteration and the next.
 </div>
 
-<<< ../reference/physics.js#satisfy-collisions-particle {*}{lines:true,startLine:299,maxHeight:'420px'}
+<<< ../reference/physics.js#satisfy-collisions-particle {*}{lines:true,startLine:331,maxHeight:'420px'}
 
 ---
 layout: default
@@ -444,7 +472,7 @@ each earlier neighbor -- one distance constraint for particles, or two corner co
 shared-edge corner pair) for rigid squares.
 </div>
 
-<<< ../reference/cloth.js#build-cloth {*}{lines:true,startLine:68,maxHeight:'420px'}
+<<< ../reference/cloth.js#build-cloth {*}{lines:true,startLine:106,maxHeight:'420px'}
 
 ---
 layout: default
@@ -459,7 +487,7 @@ constraint -- distance/corner constraints and collisions alike -- <code>accuracy
 whole concurrent system of constraints converges toward mutual satisfaction.
 </div>
 
-<<< ../reference/physics.js#simulate-step {*}{lines:true,startLine:387,maxHeight:'420px'}
+<<< ../reference/physics.js#simulate-step {*}{lines:true,startLine:419,maxHeight:'420px'}
 
 ---
 layout: default
@@ -471,11 +499,11 @@ layout: default
 
 | Case | What it tests | Run it |
 |---|---|---|
-| Default drape | Maize/blue block-M coloring, particle nodes, no tearing | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html" target="_blank">&#9654;</a> |
+| Low stiffness (default) | Maize/blue block-M coloring, particle nodes, floppy/slow-converging constraints | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html" target="_blank">&#9654;</a> |
+| Higher stiffness | `stiffness=1.0` -- a taut, less stretchy drape | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?stiffness=1.0" target="_blank">&#9654;</a> |
 | Tearable | `tear=true` -- yank the cloth apart by hand or past `tear_dist` | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?tear=true" target="_blank">&#9654;</a> |
 | Rigid-body grid | `node_type=rigid` -- squares linked at their corners | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid" target="_blank">&#9654;</a> |
-| Low stiffness | `stiffness=0.25` -- floppy, slow-converging constraints | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?stiffness=0.25" target="_blank">&#9654;</a> |
-| Windy flag | `wind=[4,0]?cloth_x=10?cloth_y=16` -- a pinned-edge flag in a crosswind | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[4,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
+| Windy flag | `wind=[4,0]?cloth_x=10?cloth_y=16` -- gusting speed/direction, with a wind-vector indicator | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[4,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
 
 </div>
 
@@ -502,21 +530,13 @@ class: text-center
 ---
 
 <div class="image-slide">
-<a href="https://github.com/Genesis-Embodied-AI/genesis-world" target="_blank">
+<a href="https://genesis-world.readthedocs.io/en/latest/" target="_blank">
 <img src="/images/genesis-heroshot.png" class="hero-image" alt="A humanoid robot simulated in the Genesis physics engine" />
 </a>
-<div class="image-caption">Where this goes next: Genesis</div>
+<div class="image-caption">Happy Simulating!</div>
 <div class="image-credit">
-<a href="https://github.com/Genesis-Embodied-AI/genesis-world">github.com/Genesis-Embodied-AI/genesis-world</a>
+<a href="https://genesis-world.readthedocs.io/en/latest/" target="_blank">Genesis Simulator</a>
 </div>
-</div>
-
-<div class="panel text-xs" style="position:absolute; left:2em; right:2em; bottom:1.2em;">
-This deck's collision handling is deliberately simple -- axis-aligned canvas walls and a flat
-ground plane, resolved as constraints. General collision detection (cloth self-collision,
-cloth-object contact, arbitrary obstacle geometry) is future work; modern robotics simulators like
-<a href="https://github.com/Genesis-Embodied-AI/genesis-world" target="_blank">Genesis</a> build on
-this same maximal-coordinate, constraint-based lineage at that much larger scale.
 </div>
 
 <div class="credit" style="position:absolute; left:0; right:0; bottom:0.4em;">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/cloth_simulation</div>
@@ -542,8 +562,10 @@ of supporting pieces none of them touch directly. For completeness, the next few
 2. **Michigan-mask node coloring** (`cloth.js`) -- the analytic block-M lookup
 3. **Mouse drag &amp; cut** (`cloth.js`, `infrastructure.js`) -- dragging and cutting the cloth by hand
 4. **Rendering** (`draw.js`) -- how each node type is actually drawn to the canvas
-5. **The animation loop** (`draw.js`) -- what calls `simulateStep()` once per frame
-6. **Reading the URL parameters** (`cloth_canvas.html`) -- how every parameter on the earlier table
+5. **Gusting wind** (`physics.js`, `draw.js`) -- the time-varying wind vector and its on-canvas indicator
+6. **The animation loop** (`draw.js`) -- what calls `simulateStep()` once per frame
+7. **A responsive canvas** (`infrastructure.js`) -- sizing the canvas to fill its container
+8. **Reading the URL parameters** (`cloth_canvas.html`) -- how every parameter on the earlier table
    gets parsed into the globals every function above reads
 
 </div>
@@ -561,7 +583,7 @@ with the same <code>applyCornerCorrection()</code> split used for corner-to-corn
 treating the boundary itself as if it were "the other body."
 </div>
 
-<<< ../reference/physics.js#satisfy-collisions-rigid {*}{lines:true,startLine:338,maxHeight:'420px'}
+<<< ../reference/physics.js#satisfy-collisions-rigid {*}{lines:true,startLine:370,maxHeight:'420px'}
 
 ---
 layout: default
@@ -592,8 +614,8 @@ same <code>active</code> flag tearing uses, so a hand-cut and an overstretch-tor
 indistinguishable to the renderer.
 </div>
 
-<<< ../reference/cloth.js#mouse-interaction {*}{lines:true,startLine:125,maxHeight:'340px'}
-<<< ../reference/infrastructure.js#mouse-handlers {*}{lines:true,startLine:70,maxHeight:'260px'}
+<<< ../reference/cloth.js#mouse-interaction {*}{lines:true,startLine:165,maxHeight:'340px'}
+<<< ../reference/infrastructure.js#mouse-handlers {*}{lines:true,startLine:82,maxHeight:'260px'}
 
 ---
 layout: default
@@ -607,8 +629,26 @@ each square's 4 world-space corners as a polygon. Both read each node's <code>co
 assigned once at grid-build time from the Michigan-mask lookup.
 </div>
 
-<<< ../reference/draw.js#draw-particle-cloth {*}{lines:true,startLine:35,maxHeight:'200px'}
-<<< ../reference/draw.js#draw-rigid-cloth {*}{lines:true,startLine:59,maxHeight:'200px'}
+<<< ../reference/draw.js#draw-particle-cloth {*}{lines:true,startLine:79,maxHeight:'200px'}
+<<< ../reference/draw.js#draw-rigid-cloth {*}{lines:true,startLine:103,maxHeight:'200px'}
+
+---
+layout: default
+---
+
+# Appendix: gusting wind
+
+<div class="panel text-xs mt-2">
+A "windy flag" should feel like weather, not a fan: <code>currentWind()</code> takes the configured
+<code>wind</code> parameter as a base magnitude/direction and gusts it over time (two independent
+sine waves, one for magnitude, one for direction). <code>drawArrow()</code> is the same vector-line
+primitive used throughout this deck's interactive panels, drawn here with plain canvas path calls
+(no images); <code>drawWindIndicator()</code> uses it to show the current gust every frame.
+</div>
+
+<<< ../reference/physics.js#wind-time-varying {*}{lines:true,startLine:52,maxHeight:'220px'}
+<<< ../reference/draw.js#draw-arrow {*}{lines:true,startLine:35,maxHeight:'220px'}
+<<< ../reference/draw.js#draw-wind-indicator {*}{lines:true,startLine:67,maxHeight:'140px'}
 
 ---
 layout: default
@@ -621,7 +661,22 @@ Called once per rendered frame via <code>requestAnimationFrame</code>: advance t
 one fixed unit timestep, then redraw. This is the dispatch that calls <code>simulateStep()</code>.
 </div>
 
-<<< ../reference/draw.js#appendix-animate {*}{lines:true,startLine:99,maxHeight:'220px'}
+<<< ../reference/draw.js#appendix-animate {*}{lines:true,startLine:144,maxHeight:'220px'}
+
+---
+layout: default
+---
+
+# Appendix: a responsive canvas
+
+<div class="panel text-xs mt-2">
+The canvas element is laid out by CSS to fill whatever space it's given (the page, or an embedding
+iframe -- see the "Try it yourself" slide); its drawing-buffer resolution is read from, and kept in
+sync with, its actual rendered size, rather than a fixed <code>width</code>/<code>height</code>
+attribute.
+</div>
+
+<<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:57,maxHeight:'200px'}
 
 ---
 layout: default
