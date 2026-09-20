@@ -24,10 +24,18 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: pathfinding/slides/package-lock.json
+          cache-dependency-path: |
+            pathfinding/slides/package-lock.json
+            cloth_simulation/slides/package-lock.json
 
       - name: Build the pathfinding Slidev deck
         working-directory: pathfinding/slides
+        run: |
+          npm install
+          npm run build
+
+      - name: Build the cloth_simulation Slidev deck
+        working-directory: cloth_simulation/slides
         run: |
           npm install
           npm run build
@@ -37,6 +45,7 @@ jobs:
           mkdir -p site
           cp index.html site/
           cp -r pathfinding/slides/dist site/pathfinding
+          cp -r cloth_simulation/slides/dist site/cloth_simulation
           cp -r simulation forward_kinematics inverse_kinematics motion_planning kineval site/
           # the 2D path-planning reference implementation is a plain,
           # dependency-free static app (no build step) -- serve it directly
@@ -46,17 +55,39 @@ jobs:
           mkdir -p site/kineval/pathplanning
           cp -r pathfinding/reference/. site/kineval/pathplanning/
           cp site/kineval/pathplanning/search_canvas.html site/kineval/pathplanning/index.html
-          # GitHub Pages only ever consults a 404.html at the site root
-          # (not one nested in a subdirectory), so a deep link into a
-          # specific slide (e.g. /pathfinding/11) 404s unless the root
-          # 404.html can bootstrap that slide's own SPA. Slidev's build
-          # already produces an index.html-equivalent 404.html for exactly
-          # this purpose (see its own absolute-path asset references) --
-          # promote the pathfinding deck's copy to the site root so deep
-          # links into it resolve. If a second Slidev deck needs the same
-          # treatment later, this will need a real path-dispatching
-          # redirect script instead of a single static copy.
-          cp site/pathfinding/404.html site/404.html
+          # same idea for the cloth-simulation reference implementation, but
+          # served alongside its own deck (site/cloth_simulation/reference/)
+          # rather than piggybacked under kineval/ the way pathfinding's is
+          mkdir -p site/cloth_simulation/reference
+          cp -r cloth_simulation/reference/. site/cloth_simulation/reference/
+          cp site/cloth_simulation/reference/cloth_canvas.html site/cloth_simulation/reference/index.html
+          # GitHub Pages only ever consults a 404.html at the site root, and
+          # each Slidev deck is its own separately-built SPA with its own JS
+          # bundle -- one deck's 404.html can't correctly bootstrap another
+          # deck's slides. Route by path prefix to that deck's own root
+          # instead (a real, existing file, so it loads correctly, just
+          # landing on slide 1 rather than the originally requested deep
+          # slide number).
+          cat > site/404.html <<'HTML404'
+          <!doctype html>
+          <html>
+          <head><meta charset="utf-8" /><title>Redirecting&hellip;</title></head>
+          <body>
+          <script>
+            var path = window.location.pathname;
+            var decks = ['pathfinding', 'cloth_simulation'];
+            var target = '/kineval/';
+            for (var i = 0; i < decks.length; i++) {
+              if (path.indexOf('/kineval/' + decks[i] + '/') === 0) {
+                target = '/kineval/' + decks[i] + '/';
+                break;
+              }
+            }
+            window.location.replace(target);
+          </script>
+          </body>
+          </html>
+          HTML404
 
       - uses: actions/upload-pages-artifact@v3
         with:

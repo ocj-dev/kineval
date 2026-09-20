@@ -114,7 +114,7 @@ concluding slide.
 layout: default
 ---
 
-# Reference implementation <a class="accent" href="../reference/cloth_canvas.html" target="_blank">(link)</a>
+# Reference implementation <a class="accent" href="/kineval/cloth_simulation/reference/cloth_canvas.html" target="_blank">(link)</a>
 
 <div class="panel text-xs mt-2">
 
@@ -471,11 +471,11 @@ layout: default
 
 | Case | What it tests | Run it |
 |---|---|---|
-| Default drape | Maize/blue block-M coloring, particle nodes, no tearing | <a href="../reference/cloth_canvas.html" target="_blank">&#9654;</a> |
-| Tearable | `tear=true` -- yank the cloth apart by hand or past `tear_dist` | <a href="../reference/cloth_canvas.html?tear=true" target="_blank">&#9654;</a> |
-| Rigid-body grid | `node_type=rigid` -- squares linked at their corners | <a href="../reference/cloth_canvas.html?node_type=rigid" target="_blank">&#9654;</a> |
-| Low stiffness | `stiffness=0.25` -- floppy, slow-converging constraints | <a href="../reference/cloth_canvas.html?stiffness=0.25" target="_blank">&#9654;</a> |
-| Windy flag | `wind=[4,0]?cloth_x=10?cloth_y=16` -- a pinned-edge flag in a crosswind | <a href="../reference/cloth_canvas.html?wind=[4,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
+| Default drape | Maize/blue block-M coloring, particle nodes, no tearing | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html" target="_blank">&#9654;</a> |
+| Tearable | `tear=true` -- yank the cloth apart by hand or past `tear_dist` | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?tear=true" target="_blank">&#9654;</a> |
+| Rigid-body grid | `node_type=rigid` -- squares linked at their corners | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid" target="_blank">&#9654;</a> |
+| Low stiffness | `stiffness=0.25` -- floppy, slow-converging constraints | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?stiffness=0.25" target="_blank">&#9654;</a> |
+| Windy flag | `wind=[4,0]?cloth_x=10?cloth_y=16` -- a pinned-edge flag in a crosswind | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[4,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
 
 </div>
 
