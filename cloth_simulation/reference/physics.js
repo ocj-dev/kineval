@@ -327,6 +327,12 @@ function satisfyConstraintRigid(cc) {
 /////     COLLISION: CANVAS WALLS + GROUND PLANE
 //////////////////////////////////////////////////
 
+// wall margin, in pixels: the collision boundary sits this far in from each
+// canvas edge, so there's a visible zone (drawn in draw.js as a filled gray
+// rectangle -- "the wall") for a node to actually collide against, rather
+// than an invisible boundary exactly at the edge of the visible canvas
+var WALL_MARGIN = 16;
+
 // #region satisfy-collisions-particle
 // Collision is treated as one more constraint, satisfied every relaxation
 // pass alongside the distance constraints -- this is what keeps a fast-moving
@@ -349,14 +355,14 @@ function satisfyCollisionsParticle(p) {
 
     if (p.pinned) return;
 
-    var rx = resolveBoundaryAxis(p.x, p.px, 0, +1);
+    var rx = resolveBoundaryAxis(p.x, p.px, WALL_MARGIN, +1);
     p.x = rx.pos; p.px = rx.prev;
-    rx = resolveBoundaryAxis(p.x, p.px, canvas_width, -1);
+    rx = resolveBoundaryAxis(p.x, p.px, canvas_width - WALL_MARGIN, -1);
     p.x = rx.pos; p.px = rx.prev;
 
-    var ry = resolveBoundaryAxis(p.y, p.py, 0, +1);
+    var ry = resolveBoundaryAxis(p.y, p.py, WALL_MARGIN, +1);
     p.y = ry.pos; p.py = ry.prev;
-    ry = resolveBoundaryAxis(p.y, p.py, canvas_height, -1);
+    ry = resolveBoundaryAxis(p.y, p.py, canvas_height - WALL_MARGIN, -1);
     p.y = ry.pos; p.py = ry.prev;
 
     for (var g = 0; g < ground_planes.length; g++) {
@@ -379,9 +385,10 @@ function satisfyCollisionsRigid(body) {
     if (body.pinned) return;
 
     var boundaries = [
-        { axis: 'x', value: 0, sign: +1 },
-        { axis: 'x', value: canvas_width, sign: -1 },
-        { axis: 'y', value: canvas_height, sign: -1 }
+        { axis: 'x', value: WALL_MARGIN, sign: +1 },
+        { axis: 'x', value: canvas_width - WALL_MARGIN, sign: -1 },
+        { axis: 'y', value: WALL_MARGIN, sign: +1 },
+        { axis: 'y', value: canvas_height - WALL_MARGIN, sign: -1 }
     ];
     for (var g = 0; g < ground_planes.length; g++)
         boundaries.push({ axis: 'y', value: ground_planes[g], sign: -1 });

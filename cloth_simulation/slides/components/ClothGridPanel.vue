@@ -2,13 +2,13 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useClothGridSimulation } from '../lib/cloth/useClothGridSimulation'
 import { worldCorner } from '../lib/cloth/clothPhysics'
-import { drawParticleDot, drawRigidSquare } from '../lib/cloth/drawUtils'
+import { drawParticleDot, drawRigidSquare, drawCollisionAreas } from '../lib/cloth/drawUtils'
 
 const WIDTH = 420, HEIGHT = 300
 const nodeType = ref<'particle' | 'rigid'>('particle')
 
 const {
-  particles, pConstraints, rigids, rConstraints, tick_count, isRunning, smooth,
+  particles, pConstraints, rigids, rConstraints, bounds, tick_count, isRunning, smooth, lowStiffness,
   play, pause, reset, stepOnce, mouseDown, mouseMove, mouseUp, dragIndex,
 } = useClothGridSimulation(WIDTH, HEIGHT, nodeType)
 
@@ -30,6 +30,7 @@ function render() {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, WIDTH, HEIGHT)
+  drawCollisionAreas(ctx, WIDTH, HEIGHT, bounds)
 
   if (nodeType.value === 'rigid') {
     for (const body of rigids) {
@@ -68,6 +69,10 @@ onBeforeUnmount(() => cancelAnimationFrame(drawRaf))
       <label class="check smooth-check">
         <input v-model="smooth" type="checkbox">
         Smooth (skip step breakdown)
+      </label>
+      <label class="check">
+        <input v-model="lowStiffness" type="checkbox">
+        Low stiffness
       </label>
       <button v-if="!isRunning" class="btn primary" @click="play">&#9654; Play</button>
       <button v-else class="btn primary" @click="pause">&#10074;&#10074; Pause</button>

@@ -74,17 +74,6 @@ particle/constraint/tear parameterization.
 
 </div>
 
-<div class="history-note mt-2">
-<b>Maximal vs. generalized coordinates</b>
-A robot arm is usually simulated in <i>generalized</i> coordinates -- one joint angle per DOF,
-guaranteed to satisfy every joint constraint automatically. Cloth (and ragdolls, and most game
-physics) instead uses <i>maximal</i> coordinates -- every node has its own free position (and,
-here, orientation), and constraints are enforced explicitly and approximately, every frame. That
-tradeoff -- give up exactness, gain the ability to add/remove/break any constraint on the fly
-(tearing!) and to keep every node's update simple and independent -- is what makes this family of
-solver so common in real-time graphics.
-</div>
-
 ---
 layout: default
 ---
@@ -116,6 +105,32 @@ as every other constraint, by relaxation, alongside the distance/corner constrai
 collision detection (cloth self-collision, cloth-object contact, arbitrary obstacle geometry) is
 deliberately out of scope; simulators like Genesis (closing slide) build on this same
 maximal-coordinate, constraint-based lineage at that much larger scale.
+</div>
+
+---
+layout: default
+---
+
+# Maximal vs. generalized coordinates
+
+<div class="panel text-sm">
+
+A robot arm is usually simulated in **generalized** coordinates -- one joint angle per degree of
+freedom, guaranteed to satisfy every joint constraint automatically by construction. Cloth (and
+ragdolls, and most game physics) instead uses **maximal** coordinates -- every node has its own
+free position (and, here, orientation), and constraints between nodes are enforced explicitly and
+only approximately, every frame, by relaxation rather than by the coordinate choice itself.
+
+</div>
+
+<div class="history-note mt-2">
+<b>The tradeoff</b>
+Maximal coordinates give up exactness -- a constraint is only ever <i>approximately</i> satisfied,
+to within whatever `accuracy` relaxation passes converge to. In exchange: any constraint can be
+added, removed, or broken on the fly (this is what makes tearing possible at all), and every
+node's per-frame update stays simple, uniform, and independent of how many other nodes or
+constraints exist -- which is exactly what makes this family of solver so common in real-time
+graphics, and so easy to parallelize.
 </div>
 
 ---
@@ -254,6 +269,8 @@ velocity, damped by <code>friction</code>, plus the new acceleration.
 <<< ../reference/physics.js#accumulate-forces {*}{lines:true,startLine:72,maxHeight:'220px'}
 <<< ../reference/physics.js#verlet-integrate-particle {*}{lines:true,startLine:93,maxHeight:'220px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: lines 4-5 (accumulate forces, then Verlet-integrate).</div>
+
 ---
 layout: default
 ---
@@ -287,6 +304,43 @@ position is, with <code>theta</code>/<code>ptheta</code> standing in for <code>x
 
 <<< ../reference/physics.js#accumulate-torque {*}{lines:true,startLine:201,maxHeight:'200px'}
 <<< ../reference/physics.js#verlet-integrate-rigid {*}{lines:true,startLine:215,maxHeight:'220px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: lines 4-5 (accumulate forces/torque, then integrate) -- see the next slide for the matrix form behind both.</div>
+
+---
+layout: default
+---
+
+# Newton-Euler in matrix form
+
+<div class="panel text-sm">
+
+Stacking the translational and rotational equations from the previous slide into one generalized
+coordinate vector **q = [x, y, &theta;]** gives exactly the general rigid-body dynamics equation
+used throughout robotics, **M(q) q&#776; = &tau;**:
+
+$$
+\underbrace{\begin{bmatrix} m & 0 & 0 \\ 0 & m & 0 \\ 0 & 0 & I \end{bmatrix}}_{M(q)}
+\begin{bmatrix} \ddot{x} \\ \ddot{y} \\ \ddot{\theta} \end{bmatrix}
+\;=\;
+\begin{bmatrix} F_x \\ F_y \\ \tau \end{bmatrix}
+$$
+
+</div>
+
+<div class="history-note mt-2">
+<b>Why M is constant here: the center of mass</b>
+For a general multi-body system, <b>M(q)</b> depends on configuration and couples every body's
+coordinates together through the constraint Jacobian. For a single free rigid body, though, <b>M</b>
+collapses to this simple, <i>constant</i>, block-diagonal form -- no coupling between translation
+and rotation at all -- specifically because <b>x, y</b> track the body's <b>center of mass</b>.
+Referencing any other point on the body would introduce off-diagonal mass-moment terms coupling
+force to angular acceleration and torque to linear acceleration. This is exactly why
+<code>RigidSquare</code>'s <code>x, y</code> is its center, not a corner, and why <code>I</code> is
+computed about that same center on the previous slide. Constraint relaxation is what
+re-introduces coupling <i>between</i> bodies -- not a globally assembled <b>M(q)</b>, but repeated
+local corrections applied to each body's own simple, center-of-mass-referenced equation of motion.
+</div>
 
 ---
 layout: default
@@ -322,6 +376,8 @@ system is ever assembled.
 
 <<< ../reference/physics.js#satisfy-constraint-particle {*}{lines:true,startLine:128,maxHeight:'420px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 7 (satisfy each constraint by relaxation).</div>
+
 ---
 layout: default
 ---
@@ -356,6 +412,8 @@ particles instead.
 
 <<< ../reference/physics.js#apply-corner-correction {*}{lines:true,startLine:255,maxHeight:'420px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 7, the helper every rigid-body relaxation call below uses.</div>
+
 ---
 layout: default
 ---
@@ -370,6 +428,8 @@ wires up every adjacent pair in the full grid.
 
 <<< ../reference/physics.js#satisfy-constraint-rigid {*}{lines:true,startLine:295,maxHeight:'380px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 7 (satisfy each constraint by relaxation).</div>
+
 ---
 layout: default
 ---
@@ -383,10 +443,13 @@ layout: default
 <!--
 Same satisfyConstraintRigid() shown on the previous slide, but called once
 (not twice) between the two squares' bottom-right corners, with a nonzero
-rest length (2x the square's side) instead of 0. With only one constraint,
-bodyB is free to swing and rotate about that single point -- contrast with
-the 2-corner "weld" a couple slides back, which fully locks relative
-orientation between adjacent squares.
+rest length (the square's side length) instead of 0. With only one
+constraint, bodyB is free to swing and rotate about that single point --
+contrast with the 2-corner "weld" a couple slides back, which fully locks
+relative orientation between adjacent squares. Gravity and wind (with the
+same joystick control as the single-rigid-square slide) act on bodyB, and
+bodyB can be picked up and dragged from anywhere within its rotated bounds,
+not just a point near its center.
 -->
 
 ---
@@ -422,6 +485,8 @@ between one <code>accuracy</code> iteration and the next.
 </div>
 
 <<< ../reference/physics.js#satisfy-collisions-particle {*}{lines:true,startLine:331,maxHeight:'420px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 8 (satisfy collisions against walls/ground).</div>
 
 ---
 layout: default
@@ -474,6 +539,8 @@ shared-edge corner pair) for rigid squares.
 
 <<< ../reference/cloth.js#build-cloth {*}{lines:true,startLine:106,maxHeight:'420px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: lines 0-1 (build the grid and its constraints, once, before the per-frame loop begins).</div>
+
 ---
 layout: default
 ---
@@ -489,6 +556,8 @@ whole concurrent system of constraints converges toward mutual satisfaction.
 
 <<< ../reference/physics.js#simulate-step {*}{lines:true,startLine:419,maxHeight:'420px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: lines 2-9, the entire per-frame loop.</div>
+
 ---
 layout: default
 ---
@@ -503,7 +572,7 @@ layout: default
 | Higher stiffness | `stiffness=1.0` -- a taut, less stretchy drape | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?stiffness=1.0" target="_blank">&#9654;</a> |
 | Tearable | `tear=true` -- yank the cloth apart by hand or past `tear_dist` | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?tear=true" target="_blank">&#9654;</a> |
 | Rigid-body grid | `node_type=rigid` -- squares linked at their corners | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid" target="_blank">&#9654;</a> |
-| Windy flag | `wind=[4,0]?cloth_x=10?cloth_y=16` -- gusting speed/direction, with a wind-vector indicator | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[4,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
+| Windy flag | `wind=[2,0]?cloth_x=10?cloth_y=16` -- gusting speed/direction, with a wind-vector indicator | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[2,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
 
 </div>
 
@@ -533,10 +602,10 @@ class: text-center
 <a href="https://genesis-world.readthedocs.io/en/latest/" target="_blank">
 <img src="/images/genesis-heroshot.png" class="hero-image" alt="A humanoid robot simulated in the Genesis physics engine" />
 </a>
-<div class="image-caption">Happy Simulating!</div>
 <div class="image-credit">
 <a href="https://genesis-world.readthedocs.io/en/latest/" target="_blank">Genesis Simulator</a>
 </div>
+<div class="image-caption">Happy Simulating!</div>
 </div>
 
 <div class="credit" style="position:absolute; left:0; right:0; bottom:0.4em;">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/cloth_simulation</div>
@@ -585,6 +654,8 @@ treating the boundary itself as if it were "the other body."
 
 <<< ../reference/physics.js#satisfy-collisions-rigid {*}{lines:true,startLine:370,maxHeight:'420px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 8 (satisfy collisions against walls/ground).</div>
+
 ---
 layout: default
 ---
@@ -598,6 +669,8 @@ per node by its normalized grid position, keeping the module fully self-containe
 </div>
 
 <<< ../reference/cloth.js#michigan-mask {*}{lines:true,startLine:36,maxHeight:'420px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- runs once, at grid-build time (line 0).</div>
 
 ---
 layout: default
@@ -617,6 +690,8 @@ indistinguishable to the renderer.
 <<< ../reference/cloth.js#mouse-interaction {*}{lines:true,startLine:165,maxHeight:'340px'}
 <<< ../reference/infrastructure.js#mouse-handlers {*}{lines:true,startLine:82,maxHeight:'260px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: the drag itself feeds into line 4 (a node's position/force each frame); the DOM event wiring here is setup, outside the loop.</div>
+
 ---
 layout: default
 ---
@@ -631,6 +706,8 @@ assigned once at grid-build time from the Michigan-mask lookup.
 
 <<< ../reference/draw.js#draw-particle-cloth {*}{lines:true,startLine:79,maxHeight:'200px'}
 <<< ../reference/draw.js#draw-rigid-cloth {*}{lines:true,startLine:103,maxHeight:'200px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 9 (draw every node and the constraints between them).</div>
 
 ---
 layout: default
@@ -650,6 +727,8 @@ primitive used throughout this deck's interactive panels, drawn here with plain 
 <<< ../reference/draw.js#draw-arrow {*}{lines:true,startLine:35,maxHeight:'220px'}
 <<< ../reference/draw.js#draw-wind-indicator {*}{lines:true,startLine:67,maxHeight:'140px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: <code>currentWind()</code> feeds line 4 (wind is a force); drawing the indicator is part of line 9.</div>
+
 ---
 layout: default
 ---
@@ -662,6 +741,8 @@ one fixed unit timestep, then redraw. This is the dispatch that calls <code>simu
 </div>
 
 <<< ../reference/draw.js#appendix-animate {*}{lines:true,startLine:144,maxHeight:'220px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 2 (<code>every frame:</code>) -- this is what actually triggers it.</div>
 
 ---
 layout: default
@@ -678,6 +759,8 @@ attribute.
 
 <<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:57,maxHeight:'200px'}
 
+<div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run at load and on resize.</div>
+
 ---
 layout: default
 ---
@@ -691,3 +774,5 @@ own URL -- this is what makes every example in this deck (and the <code>(link)</
 </div>
 
 <<< ../reference/cloth_canvas.html#appendix-url-params {*}{lines:true,startLine:87,maxHeight:'420px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run once before line 0.</div>

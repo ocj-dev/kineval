@@ -9,10 +9,12 @@ import { michiganNodeColor } from './michiganColor'
 const GRAVITY = 0.45
 const FRICTION = 0.98
 const ACCURACY = 4
-const STIFFNESS = 1.0
+const NORMAL_STIFFNESS = 1.0
+const LOW_STIFFNESS = 0.25
 const SPACING = 46
 const GRID_N = 3
 const DRAG_PICK_RADIUS = 30
+const HALF_SIZE = SPACING * 0.75 / 2   // rigid squares fill 75% of spacing
 
 interface PConstraint { i: number; j: number; rest: number }
 interface RConstraint { a: number; cornerA: number; b: number; cornerB: number }
@@ -33,6 +35,7 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
   const rigids: RigidState[] = []
   const rConstraints: RConstraint[] = []
   const pinnedFlags: boolean[] = []   // parallel to whichever array is active, so a drag can restore pin state
+  const bounds = { minX: 12, maxX: width - 12, minY: 12, maxY: height - 12 }
 
   function build() {
     particles.length = 0
@@ -50,10 +53,12 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
         const pinned = row === 0
 
         if (nodeType.value === 'rigid') {
-          const body = makeRigid(x, y, SPACING * 0.75 / 2, pinned)
+          const body = makeRigid(x, y, HALF_SIZE, pinned)
           rigids.push(body)
           pinnedFlags.push(pinned)
           grid[row][col] = rigids.length - 1
+          // adjacent squares' nearest corners are held HALF_SIZE apart
+          // (half the square's side length), not coincident
           if (col > 0) {
             rConstraints.push({ a: grid[row][col - 1], cornerA: 1, b: grid[row][col], cornerB: 0 })
             rConstraints.push({ a: grid[row][col - 1], cornerA: 2, b: grid[row][col], cornerB: 3 })
@@ -79,6 +84,7 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
   const tick_count = ref(0)
   const isRunning = ref(false)
   const smooth = ref(true)
+  const lowStiffness = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
 
   // #region mouse-drag-constraint
@@ -122,14 +128,15 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
   // #endregion mouse-drag-constraint
 
   function stepFrame() {
+    const stiffness = lowStiffness.value ? LOW_STIFFNESS : NORMAL_STIFFNESS
     if (nodeType.value === 'rigid') {
       for (const b of rigids) {
         b.force_x = 0; b.force_y = GRAVITY * b.mass; b.torque = 0
         verletIntegrateRigid(b, FRICTION)
       }
       for (let pass = 0; pass < ACCURACY; pass++) {
-        for (const c of rConstraints) satisfyConstraintRigid(rigids[c.a], c.cornerA, rigids[c.b], c.cornerB, STIFFNESS)
-        for (const b of rigids) satisfyCollisionRigid(b, { minX: 12, maxX: width - 12, minY: 12, maxY: height - 12 }, 0.4)
+        for (const c of rConstraints) satisfyConstraintRigid(rigids[c.a], c.cornerA, rigids[c.b], c.cornerB, stiffness, HALF_SIZE)
+        for (const b of rigids) satisfyCollisionRigid(b, bounds, 0.4)
       }
     } else {
       for (const p of particles) {
@@ -137,8 +144,8 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
         verletIntegrateParticle(p, FRICTION)
       }
       for (let pass = 0; pass < ACCURACY; pass++) {
-        for (const c of pConstraints) satisfyConstraintParticle(particles[c.i], particles[c.j], c.rest, STIFFNESS)
-        for (const p of particles) satisfyCollisionParticle(p, { minX: 12, maxX: width - 12, minY: 12, maxY: height - 12 }, 0.4)
+        for (const c of pConstraints) satisfyConstraintParticle(particles[c.i], particles[c.j], c.rest, stiffness)
+        for (const p of particles) satisfyCollisionParticle(p, bounds, 0.4)
       }
     }
     tick_count.value++
@@ -158,7 +165,7 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
   onBeforeUnmount(() => pause())
 
   return {
-    particles, pConstraints, rigids, rConstraints, tick_count, isRunning, smooth,
+    particles, pConstraints, rigids, rConstraints, bounds, tick_count, isRunning, smooth, lowStiffness,
     play, pause, reset, stepOnce, build, mouseDown, mouseMove, mouseUp, dragIndex,
   }
 }

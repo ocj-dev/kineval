@@ -3,25 +3,19 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import JoystickControl from './JoystickControl.vue'
 import { usePhaseTracer } from '../lib/cloth/usePhaseTracer'
+import { MASTER_PSEUDOCODE, LINE_ACCUMULATE, LINE_INTEGRATE } from '../lib/cloth/pseudocode'
 import {
   makeRigid, verletIntegrateRigid, accumulateTorque, satisfyCollisionRigid, worldCorner,
   type RigidState, type Vec2,
 } from '../lib/cloth/clothPhysics'
-import { drawArrow, drawRigidSquare } from '../lib/cloth/drawUtils'
+import { drawArrow, drawRigidSquare, drawCollisionAreas } from '../lib/cloth/drawUtils'
 
 const WIDTH = 380, HEIGHT = 240
 const GRAVITY = 0.6
 const FRICTION = 0.99
 const SCALE = 20
 const HALF = 22
-
-const PSEUDOCODE = [
-  'every frame:',
-  '    for each rigid node',
-  '        accumulate forces AND torque (gravity, wind)',
-  '        Verlet-integrate position AND orientation',
-]
-const LINE_ACCUMULATE = 2, LINE_INTEGRATE = 3
+const bounds = { minX: 10, maxX: WIDTH - 10, minY: 10, maxY: HEIGHT - 10 }
 
 interface Entry { frame: number; phase: 'accumulate' | 'integrate'; body: RigidState; vectors: { from: Vec2; to: Vec2; color: string }[] }
 
@@ -51,7 +45,7 @@ function generateFrame(): Entry[] {
   const accEntry: Entry = { frame: frameCount, phase: 'accumulate', body: { ...body }, vectors }
 
   verletIntegrateRigid(body, FRICTION)
-  satisfyCollisionRigid(body, { minX: 10, maxX: WIDTH - 10, minY: 10, maxY: HEIGHT - 10 }, 0.4)
+  satisfyCollisionRigid(body, bounds, 0.4)
   const intEntry: Entry = { frame: frameCount, phase: 'integrate', body: { ...body }, vectors }
 
   frameCount++
@@ -71,6 +65,7 @@ function render() {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, WIDTH, HEIGHT)
+  drawCollisionAreas(ctx, WIDTH, HEIGHT, bounds)
 
   const corners = [0, 1, 2, 3].map(i => worldCorner(current.value.body, i))
   drawRigidSquare(ctx, corners, '#00274C55')
@@ -88,7 +83,7 @@ watch(current, render)
 <template>
   <PhaseStepperShell
     v-model:smooth="tracer.smooth.value"
-    :pseudocode-lines="PSEUDOCODE"
+    :pseudocode-lines="MASTER_PSEUDOCODE"
     :active-line="current.phase === 'accumulate' ? LINE_ACCUMULATE : LINE_INTEGRATE"
     :is-running="tracer.isRunning.value" :is-done="tracer.isDone.value" :is-at-start="tracer.isAtStart.value"
     :step-label="current.phase === 'accumulate' ? 'Accumulate forces + torque' : 'Verlet integrate (pos + orientation)'"
@@ -103,6 +98,11 @@ watch(current, render)
     <div class="vector-canvas-wrap">
       <canvas ref="canvasRef" :width="WIDTH" :height="HEIGHT" />
     </div>
+    <div class="legend">
+      <span><i style="background:#00274C" /> gravity (F = ma)</span>
+      <span><i style="background:#1a9e6b" /> wind (produces torque about center)</span>
+      <span><i style="background:#9a9a9a" /> collision area (wall)</span>
+    </div>
   </PhaseStepperShell>
 </template>
 
@@ -110,4 +110,6 @@ watch(current, render)
 .check { font-family: var(--font-mono, monospace); font-size: 0.72em; display: flex; align-items: center; gap: 0.3em; cursor: pointer; }
 .vector-canvas-wrap { flex: 1 1 auto; min-height: 0; border: 1px solid #e3ddc9; border-radius: 10px; background: #fff; }
 .vector-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+.legend { display: flex; gap: 1em; flex-wrap: wrap; font-family: var(--font-mono, monospace); font-size: 0.62em; opacity: 0.75; }
+.legend i { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-right: 0.3em; vertical-align: -0.1em; }
 </style>

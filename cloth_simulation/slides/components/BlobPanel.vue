@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useBlobSimulation } from '../lib/cloth/useBlobSimulation'
-import { drawParticleDot } from '../lib/cloth/drawUtils'
+import { drawParticleDot, drawCollisionAreas } from '../lib/cloth/drawUtils'
 
 const WIDTH = 420, HEIGHT = 300
 
 const {
-  particles, constraints, groundY, tick_count, isRunning, smooth,
+  particles, constraints, groundY, bounds, tick_count, isRunning, smooth,
   play, pause, reset, stepOnce, mouseDown, mouseMove, mouseUp, dragIndex,
 } = useBlobSimulation(WIDTH, HEIGHT)
 
@@ -28,13 +28,7 @@ function render() {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, WIDTH, HEIGHT)
-
-  ctx.strokeStyle = '#00274C'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(0, groundY)
-  ctx.lineTo(WIDTH, groundY)
-  ctx.stroke()
+  drawCollisionAreas(ctx, WIDTH, HEIGHT, bounds, groundY)
 
   ctx.strokeStyle = '#999'
   ctx.lineWidth = 1.5

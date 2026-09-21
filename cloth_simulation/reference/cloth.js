@@ -106,9 +106,11 @@ function nodeColor(col, row) {
 // Builds the node grid and the constraints between adjacent nodes: a particle
 // grid with distance constraints (Tearable Cloth's own structure), or a
 // rigid-square grid with 2 corner constraints per shared edge (one per
-// corner pair along that edge) when node_type is "rigid". Either way, the
-// top row is pinned in place -- for rigid squares this fixes both position
-// and orientation, since verletIntegrateRigid() skips pinned bodies entirely.
+// corner pair along that edge) when node_type is "rigid" -- each held
+// half_size apart (half the square's side length) rather than coincident.
+// Either way, the top row is pinned in place -- for rigid squares this fixes
+// both position and orientation, since verletIntegrateRigid() skips pinned
+// bodies entirely.
 function Cloth() {
 
     this.nodes = [];
@@ -130,7 +132,8 @@ function Cloth() {
             if (node_type === 'rigid') {
                 // squares fill 75% of the grid spacing (side = 0.75*spacing),
                 // leaving a 25% gap between adjacent squares
-                node = new RigidSquare(x, y, spacing * 0.75 / 2);
+                var half_size = spacing * 0.75 / 2;
+                node = new RigidSquare(x, y, half_size);
             } else {
                 node = new Particle(x, y);
                 node.mass = 1;
@@ -142,15 +145,17 @@ function Cloth() {
             this.nodes.push(node);
 
             if (node_type === 'rigid') {
+                // adjacent squares' nearest corners are held half_size apart
+                // (half the square's side length) rather than coincident
                 if (col > 0) {
                     var left = this.grid[row][col - 1];
-                    this.corner_constraints.push(new CornerConstraint(left, 1, node, 0));
-                    this.corner_constraints.push(new CornerConstraint(left, 2, node, 3));
+                    this.corner_constraints.push(new CornerConstraint(left, 1, node, 0, half_size));
+                    this.corner_constraints.push(new CornerConstraint(left, 2, node, 3, half_size));
                 }
                 if (row > 0) {
                     var above = this.grid[row - 1][col];
-                    this.corner_constraints.push(new CornerConstraint(above, 3, node, 0));
-                    this.corner_constraints.push(new CornerConstraint(above, 2, node, 1));
+                    this.corner_constraints.push(new CornerConstraint(above, 3, node, 0, half_size));
+                    this.corner_constraints.push(new CornerConstraint(above, 2, node, 1, half_size));
                 }
             } else {
                 if (col > 0) this.constraints.push(new Constraint(this.grid[row][col - 1], node, spacing));

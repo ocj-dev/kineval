@@ -120,23 +120,30 @@ function drawRigidCloth() {
 }
 // #endregion draw-rigid-cloth
 
-function drawGroundPlanes() {
-    if (!ground_planes || ground_planes.length === 0) return;
-    ctx.strokeStyle = '#00274C';
-    ctx.lineWidth = 2;
-    for (var g = 0; g < ground_planes.length; g++) {
-        ctx.beginPath();
-        ctx.moveTo(0, ground_planes[g]);
-        ctx.lineTo(canvas_width, ground_planes[g]);
-        ctx.stroke();
-    }
+// #region draw-collision-areas
+// Every collision boundary -- the wall margin on all 4 canvas edges, and any
+// ground_planes[] entry -- is drawn as a filled medium-gray rectangle
+// covering the solid region beyond it, rather than a thin line at the
+// boundary itself, so the collidable "walls" and "ground" read as solid.
+var COLLISION_AREA_COLOR = '#9a9a9a';
+
+function drawCollisionAreas() {
+    ctx.fillStyle = COLLISION_AREA_COLOR;
+    ctx.fillRect(0, 0, canvas_width, WALL_MARGIN);                                   // top
+    ctx.fillRect(0, canvas_height - WALL_MARGIN, canvas_width, WALL_MARGIN);         // bottom
+    ctx.fillRect(0, 0, WALL_MARGIN, canvas_height);                                  // left
+    ctx.fillRect(canvas_width - WALL_MARGIN, 0, WALL_MARGIN, canvas_height);         // right
+
+    for (var g = 0; g < ground_planes.length; g++)
+        ctx.fillRect(0, ground_planes[g], canvas_width, canvas_height - ground_planes[g]);
 }
+// #endregion draw-collision-areas
 
 function draw() {
     ctx.clearRect(0, 0, canvas_width, canvas_height);
+    drawCollisionAreas();
     if (node_type === 'rigid') drawRigidCloth();
     else drawParticleCloth();
-    drawGroundPlanes();
     drawWindIndicator();
 }
 

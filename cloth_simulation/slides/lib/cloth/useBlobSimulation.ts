@@ -21,6 +21,7 @@ export function useBlobSimulation(width: number, height: number) {
   const particles: ParticleState[] = []
   const constraints: BlobConstraint[] = []
   const groundY = height - 24
+  const bounds = { minX: 12, maxX: width - 12, minY: 12, maxY: height - 12 }
 
   function build() {
     particles.length = 0
@@ -85,7 +86,7 @@ export function useBlobSimulation(width: number, height: number) {
     for (let pass = 0; pass < ACCURACY; pass++) {
       for (const c of constraints) satisfyConstraintParticle(particles[c.i], particles[c.j], c.rest, STIFFNESS)
       for (const p of particles)
-        satisfyCollisionParticle(p, { minX: 12, maxX: width - 12, minY: 12, maxY: height - 12, groundY }, 0.45)
+        satisfyCollisionParticle(p, { ...bounds, groundY }, 0.45)
     }
     tick_count.value++
   }
@@ -102,7 +103,7 @@ export function useBlobSimulation(width: number, height: number) {
   onBeforeUnmount(() => pause())
 
   return {
-    particles, constraints, groundY, tick_count, isRunning, smooth,
+    particles, constraints, groundY, bounds, tick_count, isRunning, smooth,
     play, pause, reset, stepOnce, mouseDown, mouseMove, mouseUp, dragIndex,
   }
 }

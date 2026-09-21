@@ -7,7 +7,7 @@ import {
   makeParticle, accumulateForces, verletIntegrateParticle, satisfyConstraintParticle,
   satisfyCollisionParticle, type ParticleState, type Vec2,
 } from '../lib/cloth/clothPhysics'
-import { drawArrow, drawParticleDot } from '../lib/cloth/drawUtils'
+import { drawArrow, drawParticleDot, drawCollisionAreas } from '../lib/cloth/drawUtils'
 
 const props = withDefaults(defineProps<{ collision?: boolean }>(), { collision: false })
 
@@ -17,6 +17,7 @@ const GRAVITY = 0.5
 const FRICTION = 0.98
 const REST_LENGTH = 70
 const SCALE = 26
+const PICK_RADIUS = 22
 const bounds = { minX: 20, maxX: WIDTH - 20, minY: 20, maxY: props.collision ? 90 : HEIGHT - 20 }
 
 type Phase = 'accumulate' | 'integrate' | 'relax' | 'collide'
@@ -75,6 +76,42 @@ const labelFor: Record<Phase, string> = {
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
+// #region mouse-drag-particle
+// The free particle p2 can be picked up and moved directly -- a stiff
+// location constraint, the same pattern the Blob/3x3-grid panels use: while
+// held it's pinned to the mouse (so accumulateForces/verletIntegrate leave
+// it alone), and the currently-displayed trace entry's snapshot is mutated
+// in place too, so the drag is visible immediately rather than waiting for
+// the next generated frame.
+let dragging = false
+
+function canvasPos(e: MouseEvent) {
+  const canvas = canvasRef.value!
+  const rect = canvas.getBoundingClientRect()
+  return { x: (e.clientX - rect.left) * (WIDTH / rect.width), y: (e.clientY - rect.top) * (HEIGHT / rect.height) }
+}
+function onDown(e: MouseEvent) {
+  const { x, y } = canvasPos(e)
+  if (Math.hypot(p2.x - x, p2.y - y) > PICK_RADIUS) return
+  dragging = true
+  p2.pinned = true
+  p2.x = x; p2.y = y
+  current.value.p2 = { x, y }
+}
+function onMove(e: MouseEvent) {
+  if (!dragging) return
+  const { x, y } = canvasPos(e)
+  p2.x = x; p2.y = y
+  current.value.p2 = { x, y }
+}
+function onUp() {
+  if (!dragging) return
+  dragging = false
+  p2.pinned = false
+  p2.px = p2.x; p2.py = p2.y
+}
+// #endregion mouse-drag-particle
+
 function render() {
   const canvas = canvasRef.value
   if (!canvas) return
@@ -82,10 +119,7 @@ function render() {
   if (!ctx) return
   ctx.clearRect(0, 0, WIDTH, HEIGHT)
 
-  if (props.collision) {
-    ctx.strokeStyle = '#00274C'; ctx.lineWidth = 2
-    ctx.beginPath(); ctx.moveTo(0, bounds.maxY); ctx.lineTo(WIDTH, bounds.maxY); ctx.stroke()
-  }
+  if (props.collision) drawCollisionAreas(ctx, WIDTH, HEIGHT, bounds)
 
   ctx.strokeStyle = '#888'; ctx.lineWidth = 2
   ctx.beginPath(); ctx.moveTo(current.value.p1.x, current.value.p1.y); ctx.lineTo(current.value.p2.x, current.value.p2.y); ctx.stroke()
@@ -115,20 +149,24 @@ watch(current, render)
     @play="tracer.play" @pause="tracer.pause" @step-forward="tracer.stepForward" @step-back="tracer.stepBack" @reset="tracer.reset"
   >
     <div class="vector-canvas-wrap">
-      <canvas ref="canvasRef" :width="WIDTH" :height="HEIGHT" />
+      <canvas
+        ref="canvasRef" :width="WIDTH" :height="HEIGHT"
+        @mousedown="onDown" @mousemove="onMove" @mouseup="onUp" @mouseleave="onUp"
+      />
     </div>
     <div class="legend">
-      <span>anchor = pinned square</span>
+      <span>anchor = pinned square &middot; drag the maize particle to move it</span>
       <span v-if="current.phase === 'relax'"><i style="background:#FFCB05" /> constraint correction</span>
       <span v-else-if="current.phase === 'collide'"><i style="background:#7d3ac1" /> collision response</span>
       <span v-else><i style="background:#00274C" /> gravity force</span>
+      <span v-if="collision"><i style="background:#9a9a9a" /> collision area</span>
     </div>
   </PhaseStepperShell>
 </template>
 
 <style scoped>
 .vector-canvas-wrap { flex: 1 1 auto; min-height: 0; border: 1px solid #e3ddc9; border-radius: 10px; background: #fff; }
-.vector-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
-.legend { display: flex; gap: 1em; font-family: var(--font-mono, monospace); font-size: 0.6em; opacity: 0.75; }
+.vector-canvas-wrap canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+.legend { display: flex; gap: 1em; flex-wrap: wrap; font-family: var(--font-mono, monospace); font-size: 0.6em; opacity: 0.75; }
 .legend i { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-right: 0.3em; vertical-align: -0.1em; }
 </style>

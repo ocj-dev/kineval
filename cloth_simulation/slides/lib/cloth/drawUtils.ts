@@ -56,6 +56,26 @@ export function drawRigidSquare(
   ctx.stroke()
 }
 
+export const COLLISION_AREA_COLOR = '#9a9a9a'
+
+// Draws every collision boundary -- the walls around `bounds`, and the
+// ground plane at `groundY` when given -- as filled medium-gray rectangles
+// covering the solid region beyond each one, mirroring reference/draw.js's
+// drawCollisionAreas(). Call this before drawing the simulated nodes so they
+// render on top.
+export function drawCollisionAreas(
+  ctx: CanvasRenderingContext2D, width: number, height: number,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  groundY?: number,
+) {
+  ctx.fillStyle = COLLISION_AREA_COLOR
+  ctx.fillRect(0, 0, bounds.minX, height)
+  ctx.fillRect(bounds.maxX, 0, width - bounds.maxX, height)
+  ctx.fillRect(bounds.minX, 0, bounds.maxX - bounds.minX, bounds.minY)
+  const floor = groundY ?? bounds.maxY
+  ctx.fillRect(bounds.minX, floor, bounds.maxX - bounds.minX, height - floor)
+}
+
 export const VECTOR_COLORS = {
   gravity: '#00274C',
   wind: '#1a9e6b',
