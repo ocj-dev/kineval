@@ -85,6 +85,7 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
   const isRunning = ref(false)
   const smooth = ref(true)
   const lowStiffness = ref(false)
+  const enforceConstraints = ref(true)
   let timer: ReturnType<typeof setTimeout> | null = null
 
   // #region mouse-drag-constraint
@@ -135,7 +136,8 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
         verletIntegrateRigid(b, FRICTION)
       }
       for (let pass = 0; pass < ACCURACY; pass++) {
-        for (const c of rConstraints) satisfyConstraintRigid(rigids[c.a], c.cornerA, rigids[c.b], c.cornerB, stiffness, HALF_SIZE)
+        if (enforceConstraints.value)
+          for (const c of rConstraints) satisfyConstraintRigid(rigids[c.a], c.cornerA, rigids[c.b], c.cornerB, stiffness, HALF_SIZE)
         for (const b of rigids) satisfyCollisionRigid(b, bounds, 0.4)
       }
     } else {
@@ -144,7 +146,8 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
         verletIntegrateParticle(p, FRICTION)
       }
       for (let pass = 0; pass < ACCURACY; pass++) {
-        for (const c of pConstraints) satisfyConstraintParticle(particles[c.i], particles[c.j], c.rest, stiffness)
+        if (enforceConstraints.value)
+          for (const c of pConstraints) satisfyConstraintParticle(particles[c.i], particles[c.j], c.rest, stiffness)
         for (const p of particles) satisfyCollisionParticle(p, bounds, 0.4)
       }
     }
@@ -165,7 +168,7 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
   onBeforeUnmount(() => pause())
 
   return {
-    particles, pConstraints, rigids, rConstraints, bounds, tick_count, isRunning, smooth, lowStiffness,
+    particles, pConstraints, rigids, rConstraints, bounds, tick_count, isRunning, smooth, lowStiffness, enforceConstraints,
     play, pause, reset, stepOnce, build, mouseDown, mouseMove, mouseUp, dragIndex,
   }
 }

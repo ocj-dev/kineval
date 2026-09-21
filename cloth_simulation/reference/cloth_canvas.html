@@ -43,6 +43,8 @@
         ground plane
       node_type: "particle" or "rigid" -- whether cloth nodes are point
         particles or rigid squares linked at their corners
+      pin_mode: "row" (default) pins the entire top row; "top_center" pins
+        only the node(s) closest to the horizontal center
       stiffness: 0-1 scale on the correction applied during each relaxation
         pass, for both distance and corner constraints
       michigan_colors: boolean, whether nodes are tinted maize/blue in a
@@ -108,6 +110,10 @@
       // Default node type: "particle" or "rigid"
       node_type = "particle";
 
+      // Default pin pattern for the top row: "row" pins the entire top row;
+      // "top_center" pins only the node(s) closest to the horizontal center
+      pin_mode = "row";
+
       // Default constraint-relaxation stiffness (0-1) -- low stiffness is
       // the default so the cloth's give is visible out of the box; pass
       // ?stiffness=1.0 for a stiffer, less stretchy cloth.
@@ -123,7 +129,7 @@
       var url_parsed = window.location.href.split("?");
       for (i = 1; i < url_parsed.length; i++) {
           var param_parsed = url_parsed[i].split("=");
-          if (param_parsed[0] !== "node_type") {
+          if (param_parsed[0] !== "node_type" && param_parsed[0] !== "pin_mode") {
               eval(param_parsed[0] + "=" + param_parsed[1]);
           } else {
               eval(param_parsed[0] + "=\'" + param_parsed[1] + "\'");

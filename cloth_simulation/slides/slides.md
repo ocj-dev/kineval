@@ -155,6 +155,7 @@ Every run is configured entirely through URL parameters, extending Tearable Clot
 | `friction` | number (default `0.98`) | Verlet velocity damping |
 | `bounce` | number (default `0.5`) | restitution on wall/ground collision |
 | `node_type` | `particle`\|`rigid` (default `particle`) | point particles, or rigid squares linked at corners |
+| `pin_mode` | `row`\|`top_center` (default `row`) | pin the whole top row, or just its center node(s) |
 | `stiffness` | 0&ndash;1 (default `0.25`) | scale on each relaxation pass's correction |
 | `michigan_colors` | `true`\|`false` (default `true`) | maize/blue block-M node coloring |
 | `wind` | `[x,y]` (default `[0,0]`) | base wind force -- gusts in magnitude/direction over time when non-zero |
@@ -446,10 +447,9 @@ Same satisfyConstraintRigid() shown on the previous slide, but called once
 rest length (the square's side length) instead of 0. With only one
 constraint, bodyB is free to swing and rotate about that single point --
 contrast with the 2-corner "weld" a couple slides back, which fully locks
-relative orientation between adjacent squares. Gravity and wind (with the
-same joystick control as the single-rigid-square slide) act on bodyB, and
-bodyB can be picked up and dragged from anywhere within its rotated bounds,
-not just a point near its center.
+relative orientation between adjacent squares. Gravity acts on bodyB, which
+can be picked up and dragged from anywhere within its rotated bounds, not
+just a point near its center.
 -->
 
 ---
@@ -571,7 +571,7 @@ layout: default
 | Low stiffness (default) | Maize/blue block-M coloring, particle nodes, floppy/slow-converging constraints | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html" target="_blank">&#9654;</a> |
 | Higher stiffness | `stiffness=1.0` -- a taut, less stretchy drape | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?stiffness=1.0" target="_blank">&#9654;</a> |
 | Tearable | `tear=true` -- yank the cloth apart by hand or past `tear_dist` | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?tear=true" target="_blank">&#9654;</a> |
-| Rigid-body grid | `node_type=rigid` -- squares linked at their corners | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid" target="_blank">&#9654;</a> |
+| Rigid-body grid | `node_type=rigid?stiffness=1.0` -- squares linked at their corners, held taut | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid?stiffness=1.0" target="_blank">&#9654;</a> |
 | Windy flag | `wind=[2,0]?cloth_x=10?cloth_y=16` -- gusting speed/direction, with a wind-vector indicator | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[2,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
 
 </div>
@@ -583,14 +583,16 @@ layout: default
 # Try it yourself
 
 <div class="content-body">
-<ClothPanel query="?node_type=rigid?wind=[2,0]" />
+<ClothPanel query="?node_type=rigid?wind=[2,0]?pin_mode=top_center" />
 </div>
 
 <!--
-Live, embedded reference implementation. Drag to pull the cloth, right-click
-to cut it; edit the iframe's query string (or open the link on the parameter
-table slide in a new tab) to try any of the 5 cases above, or your own
-combination of parameters.
+Live, embedded reference implementation. Anchored only at its top-center
+node(s) (pin_mode=top_center) rather than the whole top row, so it hangs and
+sways more freely in the wind. Drag to pull the cloth, right-click to cut it;
+edit the iframe's query string (or open the link on the parameter table
+slide in a new tab) to try any of the 5 cases above, or your own combination
+of parameters.
 -->
 
 ---
@@ -773,6 +775,6 @@ own URL -- this is what makes every example in this deck (and the <code>(link)</
 "Reference implementation" slide) just a plain hyperlink, no server or build step involved.
 </div>
 
-<<< ../reference/cloth_canvas.html#appendix-url-params {*}{lines:true,startLine:87,maxHeight:'420px'}
+<<< ../reference/cloth_canvas.html#appendix-url-params {*}{lines:true,startLine:89,maxHeight:'420px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run once before line 0.</div>

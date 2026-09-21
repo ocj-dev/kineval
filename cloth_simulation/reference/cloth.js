@@ -110,7 +110,10 @@ function nodeColor(col, row) {
 // half_size apart (half the square's side length) rather than coincident.
 // Either way, the top row is pinned in place -- for rigid squares this fixes
 // both position and orientation, since verletIntegrateRigid() skips pinned
-// bodies entirely.
+// bodies entirely. Which nodes of the top row get pinned depends on
+// pin_mode: "row" pins the whole row (the default); "top_center" pins only
+// the node(s) closest to the horizontal center, letting the rest of the
+// cloth hang and drape from a point instead of a clamped edge.
 function Cloth() {
 
     this.nodes = [];
@@ -120,6 +123,7 @@ function Cloth() {
 
     var start_x = canvas_width / 2 - (cloth_x - 1) * spacing / 2;
     var start_y = spacing;
+    var center_col = (cloth_x - 1) / 2;
 
     for (var row = 0; row < cloth_y; row++) {
         this.grid[row] = [];
@@ -139,7 +143,8 @@ function Cloth() {
                 node.mass = 1;
             }
             node.color = nodeColor(col, row);
-            node.pinned = (row === 0);
+            node.pinned = (row === 0) &&
+                (pin_mode !== 'top_center' || Math.abs(col - center_col) <= 0.5);
 
             this.grid[row][col] = node;
             this.nodes.push(node);

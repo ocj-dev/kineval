@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
-import JoystickControl from './JoystickControl.vue'
 import { usePhaseTracer } from '../lib/cloth/usePhaseTracer'
 import { MASTER_PSEUDOCODE, LINE_ACCUMULATE, LINE_INTEGRATE, LINE_RELAX } from '../lib/cloth/pseudocode'
 import {
-  makeRigid, verletIntegrateRigid, accumulateTorque, satisfyConstraintRigid, worldCorner,
+  makeRigid, verletIntegrateRigid, satisfyConstraintRigid, worldCorner,
   type RigidState, type Vec2,
 } from '../lib/cloth/clothPhysics'
 import { drawArrow, drawRigidSquare } from '../lib/cloth/drawUtils'
@@ -22,8 +21,6 @@ type Phase = 'accumulate' | 'integrate' | 'relax'
 interface Entry { frame: number; phase: Phase; bodyA: RigidState; bodyB: RigidState; vectors: { from: Vec2; to: Vec2; color: string }[] }
 
 const gravityOn = ref(true)
-const windOn = ref(false)
-const wind = ref({ x: 0, y: 0 })
 
 function initial() {
   const a = makeRigid(120, 50, HALF, true)
@@ -42,13 +39,6 @@ function generateFrame(): Entry[] {
   if (gravityOn.value) {
     bodyB.force_y += GRAVITY * bodyB.mass
     vectors.push({ from: { x: bodyB.x, y: bodyB.y }, to: { x: bodyB.x, y: bodyB.y + GRAVITY * 24 }, color: '#00274C' })
-  }
-  if (windOn.value) {
-    const c = worldCorner(bodyB, 1)
-    accumulateTorque(bodyB, c.x, c.y, wind.value.x, wind.value.y)
-    bodyB.force_x += wind.value.x
-    bodyB.force_y += wind.value.y
-    vectors.push({ from: c, to: { x: c.x + wind.value.x * 20, y: c.y + wind.value.y * 20 }, color: '#1a9e6b' })
   }
   entries.push({ frame: frameCount, phase: 'accumulate', bodyA: { ...bodyA }, bodyB: { ...bodyB }, vectors })
 
@@ -166,8 +156,6 @@ watch(current, render)
   >
     <template #controls>
       <label class="check"><input v-model="gravityOn" type="checkbox"> Gravity</label>
-      <label class="check"><input v-model="windOn" type="checkbox"> Wind</label>
-      <JoystickControl v-model="wind" :max-magnitude="1.2" label="Wind (mag + dir)" />
     </template>
     <div class="vector-canvas-wrap">
       <canvas

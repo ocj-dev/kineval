@@ -6,7 +6,7 @@ import { drawParticleDot, drawCollisionAreas } from '../lib/cloth/drawUtils'
 const WIDTH = 420, HEIGHT = 300
 
 const {
-  particles, constraints, groundY, bounds, tick_count, isRunning, smooth,
+  particles, constraints, groundY, bounds, tick_count, isRunning, smooth, enforceConstraints,
   play, pause, reset, stepOnce, mouseDown, mouseMove, mouseUp, dragIndex,
 } = useBlobSimulation(WIDTH, HEIGHT)
 
@@ -30,7 +30,7 @@ function render() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT)
   drawCollisionAreas(ctx, WIDTH, HEIGHT, bounds, groundY)
 
-  ctx.strokeStyle = '#999'
+  ctx.strokeStyle = enforceConstraints.value ? '#999' : '#ddd'
   ctx.lineWidth = 1.5
   ctx.beginPath()
   for (const c of constraints) {
@@ -54,6 +54,10 @@ onBeforeUnmount(() => cancelAnimationFrame(drawRaf))
       <label class="check smooth-check">
         <input v-model="smooth" type="checkbox">
         Smooth (skip step breakdown)
+      </label>
+      <label class="check">
+        <input v-model="enforceConstraints" type="checkbox">
+        Enforce constraints
       </label>
       <button v-if="!isRunning" class="btn primary" @click="play">&#9654; Play</button>
       <button v-else class="btn primary" @click="pause">&#10074;&#10074; Pause</button>

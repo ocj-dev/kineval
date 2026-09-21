@@ -8,7 +8,7 @@ const WIDTH = 420, HEIGHT = 300
 const nodeType = ref<'particle' | 'rigid'>('particle')
 
 const {
-  particles, pConstraints, rigids, rConstraints, bounds, tick_count, isRunning, smooth, lowStiffness,
+  particles, pConstraints, rigids, rConstraints, bounds, tick_count, isRunning, smooth, lowStiffness, enforceConstraints,
   play, pause, reset, stepOnce, mouseDown, mouseMove, mouseUp, dragIndex,
 } = useClothGridSimulation(WIDTH, HEIGHT, nodeType)
 
@@ -38,7 +38,7 @@ function render() {
       drawRigidSquare(ctx, corners, body.pinned ? '#00274Ccc' : '#FFCB05cc')
     }
   } else {
-    ctx.strokeStyle = '#999'
+    ctx.strokeStyle = enforceConstraints.value ? '#999' : '#ddd'
     ctx.lineWidth = 1.5
     ctx.beginPath()
     for (const c of pConstraints) {
@@ -73,6 +73,10 @@ onBeforeUnmount(() => cancelAnimationFrame(drawRaf))
       <label class="check">
         <input v-model="lowStiffness" type="checkbox">
         Low stiffness
+      </label>
+      <label class="check">
+        <input v-model="enforceConstraints" type="checkbox">
+        Enforce constraints
       </label>
       <button v-if="!isRunning" class="btn primary" @click="play">&#9654; Play</button>
       <button v-else class="btn primary" @click="pause">&#10074;&#10074; Pause</button>

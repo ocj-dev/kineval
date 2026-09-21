@@ -42,6 +42,7 @@ export function useBlobSimulation(width: number, height: number) {
   const tick_count = ref(0)
   const isRunning = ref(false)
   const smooth = ref(true)
+  const enforceConstraints = ref(true)
   let timer: ReturnType<typeof setTimeout> | null = null
 
   // #region mouse-drag-constraint
@@ -84,7 +85,8 @@ export function useBlobSimulation(width: number, height: number) {
       verletIntegrateParticle(p, FRICTION)
     }
     for (let pass = 0; pass < ACCURACY; pass++) {
-      for (const c of constraints) satisfyConstraintParticle(particles[c.i], particles[c.j], c.rest, STIFFNESS)
+      if (enforceConstraints.value)
+        for (const c of constraints) satisfyConstraintParticle(particles[c.i], particles[c.j], c.rest, STIFFNESS)
       for (const p of particles)
         satisfyCollisionParticle(p, { ...bounds, groundY }, 0.45)
     }
@@ -103,7 +105,7 @@ export function useBlobSimulation(width: number, height: number) {
   onBeforeUnmount(() => pause())
 
   return {
-    particles, constraints, groundY, bounds, tick_count, isRunning, smooth,
+    particles, constraints, groundY, bounds, tick_count, isRunning, smooth, enforceConstraints,
     play, pause, reset, stepOnce, mouseDown, mouseMove, mouseUp, dragIndex,
   }
 }
