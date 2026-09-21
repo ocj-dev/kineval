@@ -15,6 +15,10 @@ const SPACING = 46
 const GRID_N = 3
 const DRAG_PICK_RADIUS = 30
 const HALF_SIZE = SPACING * 0.75 / 2   // rigid squares fill 75% of spacing
+// the actual gap between adjacent squares' touching corners at
+// construction -- used as the corner constraints' rest length so relaxation
+// isn't fighting a pre-stretched grid
+const CORNER_REST = SPACING - 2 * HALF_SIZE
 
 interface PConstraint { i: number; j: number; rest: number }
 interface RConstraint { a: number; cornerA: number; b: number; cornerB: number }
@@ -24,7 +28,8 @@ export interface GridParticle extends ParticleState { color: string }
 // row pinned, particle nodes with distance constraints or rigid-square nodes
 // with 2 corner constraints per shared edge, depending on nodeType. Rigid
 // squares are sized 75% of the grid spacing (25% gap between neighbors),
-// matching the reference implementation's rule for grid-arranged squares.
+// with the corner constraints' rest length set to that same gap (CORNER_REST)
+// so the grid isn't pre-stretched from the moment it's built.
 export function useClothGridSimulation(width: number, height: number, nodeType: Ref<'particle' | 'rigid'>) {
 
   const startX = width / 2 - (SPACING * (GRID_N - 1)) / 2
@@ -57,8 +62,8 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
           rigids.push(body)
           pinnedFlags.push(pinned)
           grid[row][col] = rigids.length - 1
-          // adjacent squares' nearest corners are held HALF_SIZE apart
-          // (half the square's side length), not coincident
+          // adjacent squares' nearest corners are held CORNER_REST apart
+          // (the real gap between them at construction), not coincident
           if (col > 0) {
             rConstraints.push({ a: grid[row][col - 1], cornerA: 1, b: grid[row][col], cornerB: 0 })
             rConstraints.push({ a: grid[row][col - 1], cornerA: 2, b: grid[row][col], cornerB: 3 })
@@ -137,7 +142,7 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
       }
       for (let pass = 0; pass < ACCURACY; pass++) {
         if (enforceConstraints.value)
-          for (const c of rConstraints) satisfyConstraintRigid(rigids[c.a], c.cornerA, rigids[c.b], c.cornerB, stiffness, HALF_SIZE)
+          for (const c of rConstraints) satisfyConstraintRigid(rigids[c.a], c.cornerA, rigids[c.b], c.cornerB, stiffness, CORNER_REST)
         for (const b of rigids) satisfyCollisionRigid(b, bounds, 0.4)
       }
     } else {
