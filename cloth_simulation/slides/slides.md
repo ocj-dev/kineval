@@ -88,7 +88,7 @@ simulation shipping today: Unity's cloth component, Unreal Engine's Chaos Cloth,
 FleX/PhysX, and Blender's cloth simulator all satisfy geometric constraints by iterated correction
 rather than assembling and inverting a stiffness matrix every frame. The same idea, extended to
 rigid bodies (as this module's `node_type=rigid` does) and full 3D, underpins modern robotics
-physics engines as well -- see the closing slide for [Genesis](https://github.com/Genesis-Embodied-AI/genesis-world),
+physics engines as well, such as [Genesis](https://github.com/Genesis-Embodied-AI/genesis-world),
 a current research/robotics simulator built on exactly this family of solver.
 
 The appeal is the same reason it worked for a 2001 real-time game: relaxation is simple to
@@ -103,8 +103,8 @@ iterations just mean a softer, springier result instead of a diverging solve.
 This deck's cloth also collides with the canvas walls and any ground plane -- handled the same way
 as every other constraint, by relaxation, alongside the distance/corner constraints. General
 collision detection (cloth self-collision, cloth-object contact, arbitrary obstacle geometry) is
-deliberately out of scope; simulators like Genesis (closing slide) build on this same
-maximal-coordinate, constraint-based lineage at that much larger scale.
+deliberately out of scope; simulators like Genesis build on this same maximal-coordinate,
+constraint-based lineage at that much larger scale.
 </div>
 
 ---
@@ -571,7 +571,7 @@ layout: default
 | Low stiffness (default) | Maize/blue block-M coloring, particle nodes, floppy/slow-converging constraints | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html" target="_blank">&#9654;</a> |
 | Higher stiffness | `stiffness=1.0` -- a taut, less stretchy drape | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?stiffness=1.0" target="_blank">&#9654;</a> |
 | Tearable | `tear=true` -- yank the cloth apart by hand or past `tear_dist` | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?tear=true" target="_blank">&#9654;</a> |
-| Rigid-body grid | `node_type=rigid?stiffness=1.0` -- squares linked at their corners, held taut | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid?stiffness=1.0" target="_blank">&#9654;</a> |
+| Rigid-body grid | `node_type=rigid` -- squares linked at their corners | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid" target="_blank">&#9654;</a> |
 | Windy flag | `wind=[2,0]?cloth_x=10?cloth_y=16` -- gusting speed/direction, with a wind-vector indicator | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[2,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
 
 </div>
@@ -583,16 +583,16 @@ layout: default
 # Try it yourself
 
 <div class="content-body">
-<ClothPanel query="?node_type=rigid?wind=[2,0]?pin_mode=top_center" />
+<ClothPanel query="?node_type=rigid?pin_mode=top_center" />
 </div>
 
 <!--
 Live, embedded reference implementation. Anchored only at its top-center
 node(s) (pin_mode=top_center) rather than the whole top row, so it hangs and
-sways more freely in the wind. Drag to pull the cloth, right-click to cut it;
-edit the iframe's query string (or open the link on the parameter table
-slide in a new tab) to try any of the 5 cases above, or your own combination
-of parameters.
+sways more freely under gravity alone. Drag to pull the cloth, right-click
+to cut it; edit the iframe's query string (or open the link on the
+parameter table slide in a new tab) to try any of the 5 cases above, or
+your own combination of parameters.
 -->
 
 ---
@@ -601,19 +601,14 @@ class: text-center
 ---
 
 <div class="image-slide">
-<a href="https://genesis-world.readthedocs.io/en/latest/" target="_blank">
-<img src="/images/genesis-heroshot.png" class="hero-image" alt="A humanoid robot simulated in the Genesis physics engine" />
-</a>
-<div class="image-credit">
-<a href="https://genesis-world.readthedocs.io/en/latest/" target="_blank">Genesis Simulator</a>
-</div>
-<div class="image-caption">Happy Simulating!</div>
+<img src="/images/go-blue-robot.jpg" class="hero-image" alt="An MBot omni-wheel robot with a flexible chainmail-like panel woven in a maize and blue block-M pattern" />
+<div class="image-caption">Go Blue!</div>
 </div>
 
 <div class="credit" style="position:absolute; left:0; right:0; bottom:0.4em;">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/cloth_simulation</div>
 
 <!--
-Concluding slide, before the appendix. Genesis link + hero image per the plan.
+Concluding slide, before the appendix.
 -->
 
 ---

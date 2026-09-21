@@ -9,7 +9,14 @@ import { michiganNodeColor } from './michiganColor'
 const GRAVITY = 0.45
 const FRICTION = 0.98
 const ACCURACY = 4
-const NORMAL_STIFFNESS = 1.0
+// rigid squares default to a lower stiffness than particles: each interior
+// square carries up to 8 corner constraints at once, so full-strength
+// relaxation with only ACCURACY passes is visibly jittery (see cloth.js's
+// build-cloth region for the corner_rest fix that removed the worse,
+// diverging half of this -- the remaining jitter at high stiffness is just
+// inherent to a densely-coupled Gauss-Seidel solve with few iterations)
+const PARTICLE_STIFFNESS = 1.0
+const RIGID_STIFFNESS = 0.4
 const LOW_STIFFNESS = 0.25
 const SPACING = 46
 const GRID_N = 3
@@ -134,7 +141,8 @@ export function useClothGridSimulation(width: number, height: number, nodeType: 
   // #endregion mouse-drag-constraint
 
   function stepFrame() {
-    const stiffness = lowStiffness.value ? LOW_STIFFNESS : NORMAL_STIFFNESS
+    const baseStiffness = nodeType.value === 'rigid' ? RIGID_STIFFNESS : PARTICLE_STIFFNESS
+    const stiffness = lowStiffness.value ? LOW_STIFFNESS : baseStiffness
     if (nodeType.value === 'rigid') {
       for (const b of rigids) {
         b.force_x = 0; b.force_y = GRAVITY * b.mass; b.torque = 0
