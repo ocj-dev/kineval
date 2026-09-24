@@ -142,10 +142,10 @@ function Cloth() {
                 // length so it matches the grid's built geometry exactly
                 var half_size = spacing * 0.75 / 2;
                 var corner_rest = spacing - 2 * half_size;
-                node = new RigidSquare(x, y, half_size);
+                node = new RigidSquare(x, y, half_size, mass);
             } else {
                 node = new Particle(x, y);
-                node.mass = 1;
+                node.mass = mass;
             }
             node.color = nodeColor(col, row);
             node.pinned = (row === 0) &&

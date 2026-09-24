@@ -43,6 +43,8 @@
         ground plane
       node_type: "particle" or "rigid" -- whether cloth nodes are point
         particles or rigid squares linked at their corners
+      mass: per-node mass (default 1.0); for rigid squares this also scales
+        their moment of inertia, since I is computed from mass and half_size
       pin_mode: "row" (default) pins the entire top row; "top_center" pins
         only the node(s) closest to the horizontal center
       stiffness: 0-1 scale on the correction applied during each relaxation
@@ -109,6 +111,9 @@
 
       // Default node type: "particle" or "rigid"
       node_type = "particle";
+
+      // Default per-node mass
+      mass = 1.0;
 
       // Default pin pattern for the top row: "row" pins the entire top row;
       // "top_center" pins only the node(s) closest to the horizontal center

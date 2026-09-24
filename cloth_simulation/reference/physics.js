@@ -158,7 +158,7 @@ function satisfyConstraintParticle(c) {
 /////     RIGID SQUARE NODE (node_type = "rigid")
 //////////////////////////////////////////////////
 
-function RigidSquare(x, y, half_size) {
+function RigidSquare(x, y, half_size, mass) {
     this.x = x;
     this.y = y;
     this.px = x;
@@ -166,7 +166,7 @@ function RigidSquare(x, y, half_size) {
     this.theta = 0;
     this.ptheta = 0;
     this.half_size = half_size;
-    this.mass = 1;
+    this.mass = (mass !== undefined) ? mass : 1;
     // moment of inertia of a uniform square plate about its center: m*side^2/6
     this.I = this.mass * (2 * half_size) * (2 * half_size) / 6;
     this.force_x = 0;
