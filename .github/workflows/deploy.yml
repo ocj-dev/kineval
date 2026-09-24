@@ -27,6 +27,7 @@ jobs:
           cache-dependency-path: |
             pathfinding/slides/package-lock.json
             cloth_simulation/slides/package-lock.json
+            simulation/slides/package-lock.json
 
       - name: Build the pathfinding Slidev deck
         working-directory: pathfinding/slides
@@ -40,13 +41,20 @@ jobs:
           npm install
           npm run build
 
+      - name: Build the simulation (Pendularm) Slidev deck
+        working-directory: simulation/slides
+        run: |
+          npm install
+          npm run build
+
       - name: Assemble the site
         run: |
           mkdir -p site
           cp index.html site/
           cp -r pathfinding/slides/dist site/pathfinding
           cp -r cloth_simulation/slides/dist site/cloth_simulation
-          cp -r simulation forward_kinematics inverse_kinematics motion_planning kineval site/
+          cp -r simulation/slides/dist site/simulation
+          cp -r forward_kinematics inverse_kinematics motion_planning kineval site/
           # the 2D path-planning reference implementation is a plain,
           # dependency-free static app (no build step) -- serve it directly
           # at kineval/pathplanning/, alongside (not instead of) the
@@ -61,6 +69,10 @@ jobs:
           mkdir -p site/cloth_simulation/reference
           cp -r cloth_simulation/reference/. site/cloth_simulation/reference/
           cp site/cloth_simulation/reference/cloth_canvas.html site/cloth_simulation/reference/index.html
+          # same idea again for the Pendularm reference implementation
+          mkdir -p site/simulation/reference
+          cp -r simulation/reference/. site/simulation/reference/
+          cp site/simulation/reference/pendularm.html site/simulation/reference/index.html
           # GitHub Pages only ever consults a 404.html at the site root, and
           # each Slidev deck is its own separately-built SPA with its own JS
           # bundle -- one deck's 404.html can't correctly bootstrap another
@@ -75,7 +87,7 @@ jobs:
           <body>
           <script>
             var path = window.location.pathname;
-            var decks = ['pathfinding', 'cloth_simulation'];
+            var decks = ['pathfinding', 'cloth_simulation', 'simulation'];
             var target = '/kineval/';
             for (var i = 0; i < decks.length; i++) {
               if (path.indexOf('/kineval/' + decks[i] + '/') === 0) {
