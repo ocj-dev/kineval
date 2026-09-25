@@ -93,15 +93,6 @@ k<sub>d</sub>, then k<sub>i</sub>" order this deck's own PID panel follows.
 
 </div>
 
-<div class="history-note mt-2">
-<b>Same lineage, one deck over</b>
-The <a href="/kineval/cloth_simulation/">cloth_simulation</a> deck's own history slides trace this
-exact same Verlet lineage into position-based dynamics; the AutoRob PID lecture revisits Jakobsen's
-"Advanced Character Physics" a second time for its <b>maximal vs. generalized coordinates</b>
-framing (see the next slide) -- constraint-based cloth and equation-of-motion-based Pendularm are,
-underneath, two answers to the same "how do you represent a moving mechanical system" question.
-</div>
-
 ---
 layout: default
 ---
@@ -155,6 +146,7 @@ run is configured entirely through URL parameters:
 | `desired` | radians, or comma pair (default `-1.0`) | PID setpoint angle(s) |
 | `servo` | `1`\|`0` (default `0`) | whether the PID servo is active on load |
 | `kp`, `kd`, `ki` | number, or comma pair | PID gains (default: the known-good `150`/`60`/`4`) |
+| `color` | `michigan`\|`red`\|`gray` (default `michigan`) | link/bob color scheme -- Michigan blue links with maize bobs, uniform red (the upstream stencil's own coloring), or uniform dark gray |
 
 ```text
 pendularm.html?links=2&integrator=euler&dt=0.3
@@ -164,16 +156,6 @@ Keys `[0-4]` select the integrator, `a`/`d` apply an impulse, `q`/`e` (and `w`/`
 adjust the desired angle, `c`/`x` toggle the servo, `s` disables it -- carried over from the upstream
 stencil. Start/Pause/Reset/Step and every parameter above are also available as on-screen controls.
 
-</div>
-
-<div class="history-note mt-2">
-<b>Two drawing scenes, same physics and URL parameters</b>
-<code>pendularm.html</code> renders with <code>scene.js</code>, a faithful port of the upstream
-stencil's own 4-leg table rig. A second entry point,
-<a href="/kineval/simulation/reference/pendularm_altdraw.html" target="_blank">pendularm_altdraw.html</a>,
-renders the same dynamics with <code>scene_altdraw.js</code> -- a simpler single-post stand -- and
-also shows <code>dt</code> in its status readout. Every test case below works with either entry
-point; just swap the filename.
 </div>
 
 ---
@@ -615,7 +597,7 @@ class: text-center
 
 <div class="image-slide">
 <img src="/images/pendularm-stencil-hero.png" class="hero-image" alt="Screenshot of the original KinEval Pendularm stencil: a red pendulum arm hanging from a gray test stand, mid-swing under Velocity Verlet integration" />
-<div class="image-caption">From a stencil to a working simulator</div>
+<div class="image-caption">Making progress, and happy hacking</div>
 </div>
 
 <div class="credit" style="position:absolute; left:0; right:0; bottom:0.4em;">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/simulation</div>
@@ -757,7 +739,7 @@ Turns the parsed parameters into the actual simulation state object every functi
 that's the selected integrator, since it needs to happen before the very first frame.
 </div>
 
-<<< ../reference/infrastructure.js#create-pendulum {*}{lines:true,startLine:70,maxHeight:'380px'}
+<<< ../reference/infrastructure.js#create-pendulum {*}{lines:true,startLine:87,maxHeight:'380px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: line 0 (initialize pendulum state).</div>
 
@@ -775,7 +757,7 @@ toggle the servo, <code>s</code> disables it. A minimal inline replacement for t
 <code>THREEx.KeyboardState</code> helper -- one dependency fewer, same continuous-hold behavior.
 </div>
 
-<<< ../reference/infrastructure.js#keyboard-state {*}{lines:true,startLine:114,maxHeight:'380px'}
+<<< ../reference/infrastructure.js#keyboard-state {*}{lines:true,startLine:131,maxHeight:'380px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: feeds into every line of the loop via user interaction, outside the loop itself.</div>
 
@@ -791,7 +773,7 @@ upgrading the stencil's plain text-only <code>textbar</code> into real on-screen
 test case works by URL alone with no keyboard interaction required.
 </div>
 
-<<< ../reference/infrastructure.js#hud-panel {*}{lines:true,startLine:155,maxHeight:'420px'}
+<<< ../reference/infrastructure.js#hud-panel {*}{lines:true,startLine:172,maxHeight:'420px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: setup code (buttons/controls), wired to lines 0-10 via their event handlers.</div>
 
@@ -807,7 +789,7 @@ frame time, so the physics is deterministic and reproducible regardless of the b
 framerate, exactly as every URL-parameter test case expects.
 </div>
 
-<<< ../reference/infrastructure.js#appendix-animate {*}{lines:true,startLine:232,maxHeight:'220px'}
+<<< ../reference/infrastructure.js#appendix-animate {*}{lines:true,startLine:247,maxHeight:'220px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: line 1 (<code>every frame:</code>) -- this is what actually triggers it.</div>
 
@@ -822,7 +804,7 @@ The three.js renderer and camera are kept in sync with the container element's a
 via a <code>ResizeObserver</code>, rather than a fixed <code>width</code>/<code>height</code>.
 </div>
 
-<<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:250,maxHeight:'140px'}
+<<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:265,maxHeight:'140px'}
 <<< ../reference/scene.js#resize-renderer {*}{lines:true,startLine:225,maxHeight:'140px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run at load and on resize.</div>

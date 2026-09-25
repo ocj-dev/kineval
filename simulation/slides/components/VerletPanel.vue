@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
 import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
@@ -14,16 +14,17 @@ import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/p
 // real "previous frame" at t=0) runs inside resetSim(), not as a traced
 // phase, matching the pseudocode note that it's setup, not part of the loop.
 
-const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0, DT = 0.03, RELEASE_ANGLE = Math.PI / 2
+const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0, DT = 0.03
+const releaseAngle = reactive({ value: Math.PI / 2 })
 
 interface Entry { frame: number; phase: 'accelerate' | 'integrate'; angle: number; angle_previous: number; angle_dot: number; accel: number }
 
-let angle = [RELEASE_ANGLE], angle_previous = [RELEASE_ANGLE], angle_dot = [0], accel = [0], frame = 0
+let angle = [releaseAngle.value], angle_previous = [releaseAngle.value], angle_dot = [0], accel = [0], frame = 0
 
 function accelFn(a: number[], w: number[]) { return pendulumAcceleration(a, w, [0], GRAVITY, [MASS], [LENGTH]) }
 
 function resetSim() {
-  angle = [RELEASE_ANGLE]; angle_dot = [0]
+  angle = [releaseAngle.value]; angle_dot = [0]
   accel = accelFn(angle, angle_dot)
   angle_previous = initVerletIntegrator(angle, angle_dot, accel, DT)   // one-time setup, not a traced phase
   frame = 0
@@ -66,6 +67,7 @@ const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
 })
 
 watch(tracer.current, redraw)
+function onControlInput() { tracer.reset() }
 </script>
 
 <template>
@@ -78,8 +80,18 @@ watch(tracer.current, redraw)
     :frame-info="`step ${tracer.pos.value + 1}/${tracer.trace.length}`"
     @play="tracer.play" @pause="tracer.pause" @step-forward="tracer.stepForward" @step-back="tracer.stepBack" @reset="tracer.reset"
   >
+    <template #controls>
+      <label class="check">
+        release angle <input type="range" min="-3.0" max="3.0" step="0.05" v-model.number="releaseAngle.value" @input="onControlInput"> {{ releaseAngle.value.toFixed(2) }} rad
+      </label>
+    </template>
     <div class="vector-canvas-wrap">
       <canvas ref="canvasEl" />
     </div>
   </PhaseStepperShell>
 </template>
+
+<style scoped>
+.check { font-family: var(--font-mono, monospace); font-size: 0.72em; display: flex; align-items: center; gap: 0.5em; }
+input[type="range"] { width: 7em; }
+</style>

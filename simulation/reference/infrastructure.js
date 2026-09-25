@@ -62,8 +62,25 @@ function readSimulationParams() {
         kp: q.has('kp') ? parseListParam(q, 'kp', [150, 60]) : null,
         kd: q.has('kd') ? parseListParam(q, 'kd', [60, 20]) : null,
         ki: q.has('ki') ? parseListParam(q, 'ki', [4, 2]) : null,
-        autoplay: q.get('autoplay') !== '0'
+        autoplay: q.get('autoplay') !== '0',
+        color: (q.get('color') || 'michigan').toLowerCase()
     };
+}
+
+// Three named color schemes for the rod(s)/link housing vs. the mass(es):
+// "michigan" (the default) uses distinct colors for each, the way the
+// reference implementation's own maize-bob convention in the Slidev deck's
+// 2D panels does; "red" and "gray" each use a single color for both,
+// matching the upstream stencil's own uniform-red rig and a neutral
+// alternative respectively.
+var PENDULUM_COLOR_SCHEMES = {
+    michigan: { link: 0x00274C, bob: 0xFFCB05 },
+    red: { link: 0xff0000, bob: 0xff0000 },
+    gray: { link: 0x4a4a4a, bob: 0x4a4a4a }
+};
+
+function resolveColorScheme(name) {
+    return PENDULUM_COLOR_SCHEMES[name] || PENDULUM_COLOR_SCHEMES.michigan;
 }
 // #endregion appendix-url-params
 
@@ -210,14 +227,12 @@ function buildHud(container, app) {
     return { status: status, integratorSelect: integratorSelect, servoCheckbox: servoCheckbox };
 }
 
-// showDt is opt-in (used by pendularm_altdraw.html only) -- the primary
-// pendularm.html's HUD omits it to stay closer to its own original design.
-function renderHudStatus(statusEl, pendulum, dt, showDt) {
+function renderHudStatus(statusEl, pendulum, dt) {
     var fmt = function (arr) { return arr.map(function (v) { return v.toFixed(3); }).join(', '); };
-    var dtText = showDt ? '   dt = ' + dt.toFixed(3) + 's' : '';
     statusEl.textContent =
         'Pendularm Dynamical Simulation\n' +
-        'links = ' + pendulum.links + '   integrator = ' + pendulum.integrator + '   t = ' + pendulum.t.toFixed(2) + 's' + dtText + '\n' +
+        'links = ' + pendulum.links + '   integrator = ' + pendulum.integrator + '\n' +
+        't = ' + pendulum.t.toFixed(2) + 's   dt = ' + dt.toFixed(3) + 's\n' +
         'angle       = [' + fmt(pendulum.angle) + ']\n' +
         'angle_dot   = [' + fmt(pendulum.angle_dot) + ']\n' +
         'desired     = [' + fmt(pendulum.desired) + ']\n' +

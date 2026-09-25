@@ -16,18 +16,19 @@ import {
 // integrate -- one visible phase per pseudocode line this slide's code
 // walkthrough covers, single pendulum, RK4, toggleable servo.
 
-const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0, DT = 0.02, RELEASE_ANGLE = Math.PI / 2
+const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0, DT = 0.02
 const servoOn = reactive({ value: true })
+const releaseAngle = reactive({ value: Math.PI / 2 })
 const desired = -1.0
 
 type Phase = 'servo-check' | 'error' | 'pid' | 'zero-control' | 'accelerate' | 'integrate' | 'advance-time'
 interface Entry { frame: number; phase: Phase; t: number; angle: number; control: number }
 
-let angle = [RELEASE_ANGLE], angle_dot = [0], previous_error = [0], accumulated_error = [0], control = [0], t = 0, frame = 0
+let angle = [releaseAngle.value], angle_dot = [0], previous_error = [0], accumulated_error = [0], control = [0], t = 0, frame = 0
 const servo = setPIDParameters(1)
 
 function resetSim() {
-  angle = [RELEASE_ANGLE]; angle_dot = [0]
+  angle = [releaseAngle.value]; angle_dot = [0]
   previous_error = [0]; accumulated_error = [0]; control = [0]
   t = 0; frame = 0
 }
@@ -93,7 +94,7 @@ const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
 })
 
 watch(tracer.current, redraw)
-function onServoToggle() { tracer.reset() }
+function onControlInput() { tracer.reset() }
 </script>
 
 <template>
@@ -108,8 +109,11 @@ function onServoToggle() { tracer.reset() }
   >
     <template #controls>
       <label class="check">
-        <input type="checkbox" v-model="servoOn.value" @change="onServoToggle">
+        <input type="checkbox" v-model="servoOn.value" @change="onControlInput">
         PID servo active (desired = {{ desired.toFixed(1) }})
+      </label>
+      <label class="check">
+        release angle <input type="range" min="-3.0" max="3.0" step="0.05" v-model.number="releaseAngle.value" @input="onControlInput"> {{ releaseAngle.value.toFixed(2) }} rad
       </label>
     </template>
     <div class="vector-canvas-wrap">
@@ -120,4 +124,5 @@ function onServoToggle() { tracer.reset() }
 
 <style scoped>
 .check { font-family: var(--font-mono, monospace); font-size: 0.72em; display: flex; align-items: center; gap: 0.4em; }
+input[type="range"] { width: 7em; }
 </style>

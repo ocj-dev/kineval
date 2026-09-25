@@ -78,7 +78,7 @@ var app = {
     servoKeyHeld: false
 };
 
-var rig = createScene(container, app.pendulum);
+var rig = createScene(container, app.pendulum, resolveColorScheme(params.color));
 var keyboard = createKeyboardState();
 var hud = buildHud(container, app);
 
@@ -94,7 +94,7 @@ observeContainerResize(container, function () { resizeRenderer(rig, container); 
 createAnimationLoop(app, function () {
     applyKeyboardBindings(keyboard, app.pendulum, app);
     updatePendulumMeshes(rig, app.pendulum);
-    renderHudStatus(hud.status, app.pendulum);
+    renderHudStatus(hud.status, app.pendulum, app.params.dt);
     rig.controls.update();
     rig.renderer.render(rig.scene, rig.camera);
 });

@@ -48,7 +48,7 @@ import { OrbitControls } from './vendor/three/OrbitControls.js';
 // The stand (legs/sidebars/crossbar) is built at a fixed size, exactly as in
 // the original -- it does not scale with the pendulum's own length/mass
 // parameters, only the arm itself does (in buildPendulumRig() below).
-function createScene(container, pendulum) {
+function createScene(container, pendulum, colors) {
 
     var scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf5f5f5);
@@ -82,7 +82,7 @@ function createScene(container, pendulum) {
     scene.add(new THREE.GridHelper(30, 30, 0xc7cad1, 0xdddfe4).translateY(-1.75));
 
     buildStand(scene);
-    var rig = buildPendulumRig(scene, pendulum);
+    var rig = buildPendulumRig(scene, pendulum, colors);
 
     var gravityArrow = makeArrow(0x1a73e8), controlArrow = makeArrow(0xe37400);
     scene.add(gravityArrow, controlArrow);
@@ -134,32 +134,36 @@ function buildStand(scene) {
 // #endregion build-stand
 
 // #region build-pendulum-rig
-// pendulum.geom (a short red disk standing in for the motor housing) is
-// added directly to the scene -- NOT nested under the stand -- at world
-// position (0, 1.5, 0), exactly as the original leaves it (its own
+// pendulum.geom (a disk standing in for the motor housing) is added
+// directly to the scene -- NOT nested under the stand -- at world position
+// (0, 1.5, 0), exactly as the original leaves it (its own
 // `crossbar.add(pendulum.geom)` line is commented out). The link and mass
 // hang from it via the same chain of one-time rotateOnAxis() calls the
 // original uses to orient a Y-aligned cylinder into a horizontal arm before
 // the per-frame rotation.y swing takes over. The second link (double
 // pendulum only) hangs from pendulum_mass the same way the original's
-// pendulum2_link/pendulum2_mass do.
-function buildPendulumRig(scene, pendulum) {
+// pendulum2_link/pendulum2_mass do. `colors` (see
+// infrastructure.js#appendix-url-params's resolveColorScheme()) sets the
+// link/housing color separately from the mass/bob color -- the original
+// used a single uniform red for both, still available as `?color=red`.
+function buildPendulumRig(scene, pendulum, colors) {
 
-    var redMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+    var linkMaterial = new THREE.MeshLambertMaterial({ color: colors.link });
+    var bobMaterial = new THREE.MeshLambertMaterial({ color: colors.bob });
 
-    var pendulumGeom = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.3, 20, 20, false), redMaterial);
+    var pendulumGeom = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.3, 20, 20, false), linkMaterial);
     pendulumGeom.rotateOnAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2);
     pendulumGeom.position.set(0, 1.5, 0);
     scene.add(pendulumGeom);
 
     var length0 = pendulum.length[0];
-    var pendulumLink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, length0, 20, 20, false), redMaterial);
+    var pendulumLink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, length0, 20, 20, false), linkMaterial);
     pendulumLink.rotateOnAxis(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
     pendulumLink.position.set(0, 0, length0 / 2);
     pendulumGeom.add(pendulumLink);
 
     var massRadius0 = Math.sqrt(pendulum.mass[0] * 0.1);
-    var pendulumMass = new THREE.Mesh(new THREE.SphereGeometry(massRadius0), redMaterial);
+    var pendulumMass = new THREE.Mesh(new THREE.SphereGeometry(massRadius0), bobMaterial);
     pendulumMass.position.set(0, -length0 / 2, 0);
     pendulumLink.add(pendulumMass);
 
@@ -167,13 +171,13 @@ function buildPendulumRig(scene, pendulum) {
 
     if (pendulum.links === 2) {
         var length1 = pendulum.length[1];
-        var pendulum2Link = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, length1, 20, 20, false), redMaterial);
+        var pendulum2Link = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, length1, 20, 20, false), linkMaterial);
         pendulum2Link.rotateOnAxis(new THREE.Vector3(0, 0, 1), Math.PI);
         pendulum2Link.position.set(0, -length1 / 2, 0);
         pendulumMass.add(pendulum2Link);
 
         var massRadius1 = Math.sqrt(pendulum.mass[1] * 0.1);
-        var pendulum2Mass = new THREE.Mesh(new THREE.SphereGeometry(massRadius1), redMaterial);
+        var pendulum2Mass = new THREE.Mesh(new THREE.SphereGeometry(massRadius1), bobMaterial);
         pendulum2Mass.position.set(0, length1 / 2, 0);
         pendulum2Link.add(pendulum2Mass);
 

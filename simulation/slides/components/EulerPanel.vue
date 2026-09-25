@@ -13,20 +13,21 @@ import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/p
 // few swings, the same "naive integrator is unstable at large dt" lesson
 // the AutoRob dynamics lecture opens with.
 
-const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0, RELEASE_ANGLE = Math.PI / 2
+const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0
 const dtSetting = reactive({ value: 0.05 })
+const releaseAngle = reactive({ value: Math.PI / 2 })
 
 interface Entry { frame: number; phase: 'accelerate' | 'integrate'; angle: number; angle_dot: number; ghostAngle: number }
 
-let angle = [RELEASE_ANGLE], angle_dot = [0], accel = [0]
-let ghostAngle = [RELEASE_ANGLE], ghostAngleDot = [0]
+let angle = [releaseAngle.value], angle_dot = [0], accel = [0]
+let ghostAngle = [releaseAngle.value], ghostAngleDot = [0]
 let frame = 0
 
 function accelFn(a: number[], w: number[]) { return pendulumAcceleration(a, w, [0], GRAVITY, [MASS], [LENGTH]) }
 
 function resetSim() {
-  angle = [RELEASE_ANGLE]; angle_dot = [0]; accel = [0]
-  ghostAngle = [RELEASE_ANGLE]; ghostAngleDot = [0]
+  angle = [releaseAngle.value]; angle_dot = [0]; accel = [0]
+  ghostAngle = [releaseAngle.value]; ghostAngleDot = [0]
   frame = 0
 }
 
@@ -70,7 +71,7 @@ const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
 })
 
 watch(tracer.current, redraw)
-function onDtInput() { tracer.reset() }
+function onControlInput() { tracer.reset() }
 </script>
 
 <template>
@@ -85,7 +86,10 @@ function onDtInput() { tracer.reset() }
   >
     <template #controls>
       <label class="check">
-        dt <input type="range" min="0.01" max="0.35" step="0.01" v-model.number="dtSetting.value" @input="onDtInput"> {{ dtSetting.value.toFixed(2) }}s
+        dt <input type="range" min="0.01" max="0.35" step="0.01" v-model.number="dtSetting.value" @input="onControlInput"> {{ dtSetting.value.toFixed(2) }}s
+      </label>
+      <label class="check">
+        release angle <input type="range" min="-3.0" max="3.0" step="0.05" v-model.number="releaseAngle.value" @input="onControlInput"> {{ releaseAngle.value.toFixed(2) }} rad
       </label>
       <span class="legend"><span class="dot maize" /> Euler &nbsp; <span class="dot ghost" /> RK4 (reference)</span>
     </template>

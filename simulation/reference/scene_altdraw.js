@@ -49,8 +49,6 @@ import { OrbitControls } from './vendor/three/OrbitControls.js';
 
 var PIVOT_HEIGHT = 4.2;   // world-space height of the top pivot above the ground plane
 var ROD_RADIUS = 0.06;
-var MASS_COLOR = 0xB3261E;
-var ROD_COLOR = 0x3a3a3a;
 var STAND_COLOR = 0x9aa0a6;
 
 // #region create-scene
@@ -59,7 +57,7 @@ var STAND_COLOR = 0x9aa0a6;
 // stencil's 4-leg table rig -- the physics is 1D/2D-planar regardless, so
 // the stand exists only to give the eye a fixed spatial reference while
 // orbiting, not to imply any structural role.
-function createScene(container, pendulum) {
+function createScene(container, pendulum, colors) {
 
     var scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf5f5f5);
@@ -104,7 +102,7 @@ function createScene(container, pendulum) {
     pivot.position.set(0.5, PIVOT_HEIGHT, 0);
     scene.add(pivot);
 
-    var links = buildLinks(pivot, pendulum);
+    var links = buildLinks(pivot, pendulum, colors);
 
     var gravityArrow = makeArrow(0x1a73e8), controlArrow = makeArrow(0xe37400);
     scene.add(gravityArrow, controlArrow);
@@ -129,7 +127,7 @@ function makeArrow(color) {
 // (angle[1] - angle[0]) -- the relative rotation that, composed with link
 // 1's absolute rotation, reproduces link 2's true absolute angle in world
 // space. See updatePendulumMeshes() below.
-function buildLinks(pivot, pendulum) {
+function buildLinks(pivot, pendulum, colors) {
 
     var out = [];
     var parent = pivot;
@@ -140,7 +138,7 @@ function buildLinks(pivot, pendulum) {
         parent.add(group);
 
         var length = pendulum.length[i];
-        var rodMaterial = new THREE.MeshStandardMaterial({ color: ROD_COLOR, roughness: 0.5 });
+        var rodMaterial = new THREE.MeshStandardMaterial({ color: colors.link, roughness: 0.5 });
         var rod = new THREE.Mesh(new THREE.CylinderGeometry(ROD_RADIUS, ROD_RADIUS, length, 16), rodMaterial);
         rod.position.y = -length / 2;
         group.add(rod);
@@ -148,7 +146,7 @@ function buildLinks(pivot, pendulum) {
         var massRadius = Math.max(0.12, Math.sqrt(pendulum.mass[i]) * 0.16);
         var mass = new THREE.Mesh(
             new THREE.SphereGeometry(massRadius, 24, 16),
-            new THREE.MeshStandardMaterial({ color: MASS_COLOR, roughness: 0.35 })
+            new THREE.MeshStandardMaterial({ color: colors.bob, roughness: 0.35 })
         );
         mass.position.y = -length;
         group.add(mass);

@@ -6,13 +6,12 @@
 
     Pendularm Dynamical Simulation (ALTDRAW variant)
 
-    Identical physics and controls to pendularm.html -- same dynamics.js and
-    infrastructure.js -- but rendered with scene_altdraw.js's simplified
-    single-post-and-crossbar stand instead of scene.js's faithful port of the
-    upstream kineval-stencil's own 4-leg table rig. See scene_altdraw.js's
-    header for why its swing rotates about a different local axis than a
-    naive port would. The HUD here additionally displays dt, which the
-    primary pendularm.html's HUD omits.
+    Identical physics, controls, and HUD to pendularm.html -- same
+    dynamics.js and infrastructure.js -- but rendered with scene_altdraw.js's
+    simplified single-post-and-crossbar stand instead of scene.js's faithful
+    port of the upstream kineval-stencil's own 4-leg table rig. See
+    scene_altdraw.js's header for why its swing rotates about a different
+    local axis than a naive port would.
 
     @author ohseejay / https://github.com/ohseejay
                      / https://bitbucket.org/ohseejay
@@ -78,7 +77,7 @@ var app = {
     servoKeyHeld: false
 };
 
-var rig = createScene(container, app.pendulum);
+var rig = createScene(container, app.pendulum, resolveColorScheme(params.color));
 var keyboard = createKeyboardState();
 var hud = buildHud(container, app);
 
@@ -94,7 +93,7 @@ observeContainerResize(container, function () { resizeRenderer(rig, container); 
 createAnimationLoop(app, function () {
     applyKeyboardBindings(keyboard, app.pendulum, app);
     updatePendulumMeshes(rig, app.pendulum);
-    renderHudStatus(hud.status, app.pendulum, app.params.dt, true);
+    renderHudStatus(hud.status, app.pendulum, app.params.dt);
     rig.controls.update();
     rig.renderer.render(rig.scene, rig.camera);
 });

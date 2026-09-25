@@ -16,8 +16,9 @@ import { MASTER_PSEUDOCODE, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
 // dt, since it isn't symplectic. Raising dt makes all of this visible much
 // faster.
 
-const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0, RELEASE_ANGLE = Math.PI / 2
+const GRAVITY = 9.81, MASS = 2.0, LENGTH = 2.0
 const dtSetting = reactive({ value: 0.05 })
+const releaseAngle = reactive({ value: Math.PI / 2 })
 
 interface Entry { frame: number; phase: 'step'; energies: { euler: number; verlet: number; velVerlet: number; rk4: number } }
 
@@ -35,9 +36,9 @@ let frame = 0
 const eulerSeries: number[] = [], verletSeries: number[] = [], velVerletSeries: number[] = [], rk4Series: number[] = []
 
 function resetSim() {
-  eAngle = [RELEASE_ANGLE]; eAngleDot = [0]
-  vAngle = [RELEASE_ANGLE]; vvAngle = [RELEASE_ANGLE]; vvAngleDot = [0]
-  rAngle = [RELEASE_ANGLE]; rAngleDot = [0]
+  eAngle = [releaseAngle.value]; eAngleDot = [0]
+  vAngle = [releaseAngle.value]; vvAngle = [releaseAngle.value]; vvAngleDot = [0]
+  rAngle = [releaseAngle.value]; rAngleDot = [0]
   const a0 = accelFn(vAngle, [0])
   vAnglePrev = initVerletIntegrator(vAngle, [0], a0, dtSetting.value)
   frame = 0
@@ -90,7 +91,7 @@ const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
 })
 
 watch(tracer.current, redraw)
-function onDtInput() { tracer.reset() }
+function onControlInput() { tracer.reset() }
 </script>
 
 <template>
@@ -105,7 +106,10 @@ function onDtInput() { tracer.reset() }
   >
     <template #controls>
       <label class="check">
-        dt <input type="range" min="0.01" max="0.2" step="0.01" v-model.number="dtSetting.value" @input="onDtInput"> {{ dtSetting.value.toFixed(2) }}s
+        dt <input type="range" min="0.01" max="0.2" step="0.01" v-model.number="dtSetting.value" @input="onControlInput"> {{ dtSetting.value.toFixed(2) }}s
+      </label>
+      <label class="check">
+        release angle <input type="range" min="-3.0" max="3.0" step="0.05" v-model.number="releaseAngle.value" @input="onControlInput"> {{ releaseAngle.value.toFixed(2) }} rad
       </label>
     </template>
     <div class="vector-canvas-wrap">

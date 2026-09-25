@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
 import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
@@ -15,19 +15,21 @@ import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/p
 // few swings.
 
 const GRAVITY = 9.81, MASS = [2.0, 2.0], LENGTH = [2.0, 2.0], DT = 0.02
-const START_A = [1.55, 1.55], START_B = [1.55, 1.551]
+const PERTURBATION = 0.001
+const releaseAngle1 = reactive({ value: 1.55 })
+const releaseAngle2 = reactive({ value: 1.55 })
 
 interface Entry { frame: number; phase: 'accelerate' | 'integrate'; angleA: number[]; angleB: number[] }
 
-let angleA = START_A.slice(), angleDotA = [0, 0]
-let angleB = START_B.slice(), angleDotB = [0, 0]
+let angleA: number[], angleDotA: number[]
+let angleB: number[], angleDotB: number[]
 let frame = 0
 
 function accelFn(a: number[], w: number[]) { return doublePendulumAcceleration(a, w, [0, 0], GRAVITY, MASS, LENGTH) }
 
 function resetSim() {
-  angleA = START_A.slice(); angleDotA = [0, 0]
-  angleB = START_B.slice(); angleDotB = [0, 0]
+  angleA = [releaseAngle1.value, releaseAngle2.value]; angleDotA = [0, 0]
+  angleB = [releaseAngle1.value, releaseAngle2.value + PERTURBATION]; angleDotB = [0, 0]
   frame = 0
 }
 
@@ -73,10 +75,11 @@ const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   ctx.fillStyle = '#202124'
   ctx.textAlign = 'left'
   const divergence = Math.hypot(e.angleA[0] - e.angleB[0], e.angleA[1] - e.angleB[1])
-  ctx.fillText(`start: theta2 differs by 0.001 rad  |  now differs by ${divergence.toFixed(4)} rad`, 12, h - 14)
+  ctx.fillText(`start: theta2 differs by ${PERTURBATION} rad  |  now differs by ${divergence.toFixed(4)} rad`, 12, h - 14)
 })
 
 watch(tracer.current, redraw)
+function onControlInput() { tracer.reset() }
 </script>
 
 <template>
@@ -90,7 +93,13 @@ watch(tracer.current, redraw)
     @play="tracer.play" @pause="tracer.pause" @step-forward="tracer.stepForward" @step-back="tracer.stepBack" @reset="tracer.reset"
   >
     <template #controls>
-      <span class="legend"><span class="dot maize" /> theta2(0)=1.550 &nbsp; <span class="dot blue" /> theta2(0)=1.551</span>
+      <label class="check">
+        release angle 1 <input type="range" min="-3.0" max="3.0" step="0.05" v-model.number="releaseAngle1.value" @input="onControlInput"> {{ releaseAngle1.value.toFixed(2) }} rad
+      </label>
+      <label class="check">
+        release angle 2 <input type="range" min="-3.0" max="3.0" step="0.05" v-model.number="releaseAngle2.value" @input="onControlInput"> {{ releaseAngle2.value.toFixed(2) }} rad
+      </label>
+      <span class="legend"><span class="dot maize" /> copy A &nbsp; <span class="dot blue" /> copy B (theta2 +{{ PERTURBATION }} rad)</span>
     </template>
     <div class="vector-canvas-wrap">
       <canvas ref="canvasEl" />
@@ -99,6 +108,8 @@ watch(tracer.current, redraw)
 </template>
 
 <style scoped>
+.check { font-family: var(--font-mono, monospace); font-size: 0.72em; display: flex; align-items: center; gap: 0.5em; }
+input[type="range"] { width: 7em; }
 .legend { font-family: var(--font-mono, monospace); font-size: 0.68em; }
 .dot { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; }
 .dot.maize { background: #FFCB05; }
