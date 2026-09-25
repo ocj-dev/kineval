@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { pendulumAcceleration } from '../lib/pendulum/pendulumPhysics'
-import { drawPendulumChain, drawVerticalReference, clearCanvas } from '../lib/pendulum/drawUtils'
+import { drawPendulumChain, drawVerticalReference, clearCanvas, MAIZE } from '../lib/pendulum/drawUtils'
 import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
 
 // RK4's four stages, each its own phase so the probe angle each stage
@@ -60,14 +61,8 @@ const activeLineFor: Record<Phase, number> = { k1: LINE_ACCEL, k2: LINE_ACCEL, k
 const labelFor: Record<Phase, string> = { k1: 'Stage k1 (start)', k2: 'Stage k2 (midpoint)', k3: 'Stage k3 (midpoint)', k4: 'Stage k4 (endpoint)', combine: 'Combine (Simpson weights 1:2:2:1)' }
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
 
-function render() {
-  const canvas = canvasEl.value
-  if (!ctx || !canvas) return
-  const w = canvas.clientWidth, h = canvas.clientHeight
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
+const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   clearCanvas(ctx, w, h)
 
   const pivotX = w / 2, pivotY = h * 0.18, linkLen = h * 0.6
@@ -75,16 +70,15 @@ function render() {
   const e = tracer.current.value
   if (!e) return
   if (e.phase !== 'combine') drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.probeAngle, length: linkLen, color: '#9aa0a660' }], 8)
-  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: '#E8710A' }])
+  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: MAIZE }])
 
   ctx.font = '12px "Roboto Mono", monospace'
   ctx.fillStyle = '#202124'
   ctx.textAlign = 'left'
   ctx.fillText(`probe angle = ${e.probeAngle.toFixed(3)}${e.phase === 'combine' ? ' (final)' : ' (faint arm)'}`, 12, h - 14)
-}
+})
 
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
+watch(tracer.current, redraw)
 </script>
 
 <template>

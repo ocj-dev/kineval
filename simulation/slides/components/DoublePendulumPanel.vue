@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { doublePendulumAcceleration, integrateRK4 } from '../lib/pendulum/pendulumPhysics'
-import { drawPendulumChain, drawVerticalReference, clearCanvas } from '../lib/pendulum/drawUtils'
+import { drawPendulumChain, drawVerticalReference, clearCanvas, MAIZE } from '../lib/pendulum/drawUtils'
 import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
 
 // The coupled double-pendulum equations of motion, run TWICE from almost
@@ -48,14 +49,8 @@ const activeLineFor: Record<Entry['phase'], number> = { accelerate: LINE_ACCEL, 
 const labelFor: Record<Entry['phase'], string> = { accelerate: 'Accelerate (both copies)', integrate: 'Integrate (both copies)' }
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
 
-function render() {
-  const canvas = canvasEl.value
-  if (!ctx || !canvas) return
-  const w = canvas.clientWidth, h = canvas.clientHeight
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
+const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   clearCanvas(ctx, w, h)
 
   const pivotX = w / 2, pivotY = h * 0.12, linkLen = h * 0.36
@@ -71,7 +66,7 @@ function render() {
   ctx.globalAlpha = 1
   drawPendulumChain(ctx, pivotX, pivotY, [
     { angleAbs: e.angleA[0], length: linkLen, color: '#E8710A80' },
-    { angleAbs: e.angleA[1], length: linkLen, color: '#E8710A' },
+    { angleAbs: e.angleA[1], length: linkLen, color: MAIZE },
   ], 9)
 
   ctx.font = '11px "Roboto Mono", monospace'
@@ -79,10 +74,9 @@ function render() {
   ctx.textAlign = 'left'
   const divergence = Math.hypot(e.angleA[0] - e.angleB[0], e.angleA[1] - e.angleB[1])
   ctx.fillText(`start: theta2 differs by 0.001 rad  |  now differs by ${divergence.toFixed(4)} rad`, 12, h - 14)
-}
+})
 
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
+watch(tracer.current, redraw)
 </script>
 
 <template>
@@ -96,7 +90,7 @@ onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
     @play="tracer.play" @pause="tracer.pause" @step-forward="tracer.stepForward" @step-back="tracer.stepBack" @reset="tracer.reset"
   >
     <template #controls>
-      <span class="legend"><span class="dot orange" /> theta2(0)=1.550 &nbsp; <span class="dot blue" /> theta2(0)=1.551</span>
+      <span class="legend"><span class="dot maize" /> theta2(0)=1.550 &nbsp; <span class="dot blue" /> theta2(0)=1.551</span>
     </template>
     <div class="vector-canvas-wrap">
       <canvas ref="canvasEl" />
@@ -107,6 +101,6 @@ onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
 <style scoped>
 .legend { font-family: var(--font-mono, monospace); font-size: 0.68em; }
 .dot { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; }
-.dot.orange { background: #E8710A; }
+.dot.maize { background: #FFCB05; }
 .dot.blue { background: #1a73e8; }
 </style>

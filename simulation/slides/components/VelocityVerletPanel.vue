@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { pendulumAcceleration } from '../lib/pendulum/pendulumPhysics'
-import { drawPendulumChain, drawVerticalReference, clearCanvas } from '../lib/pendulum/drawUtils'
+import { drawPendulumChain, drawVerticalReference, clearCanvas, MAIZE } from '../lib/pendulum/drawUtils'
 import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
 
 // Velocity Verlet, split into its two real sub-steps (unlike
@@ -46,30 +47,23 @@ const activeLineFor: Record<Entry['phase'], number> = { accelerate: LINE_ACCEL, 
 const labelFor: Record<Entry['phase'], string> = { accelerate: 'Accelerate', predict: 'Predict position', correct: 'Correct velocity' }
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
 
-function render() {
-  const canvas = canvasEl.value
-  if (!ctx || !canvas) return
-  const w = canvas.clientWidth, h = canvas.clientHeight
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
+const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   clearCanvas(ctx, w, h)
 
   const pivotX = w / 2, pivotY = h * 0.18, linkLen = h * 0.6
   drawVerticalReference(ctx, pivotX, pivotY, linkLen)
   const e = tracer.current.value
   if (!e) return
-  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: e.phase === 'predict' ? '#9aa0a6' : '#E8710A' }])
+  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: e.phase === 'predict' ? '#9aa0a6' : MAIZE }])
 
   ctx.font = '12px "Roboto Mono", monospace'
   ctx.fillStyle = '#202124'
   ctx.textAlign = 'left'
   ctx.fillText(`angle = ${e.angle.toFixed(3)}   angle_dot = ${e.angle_dot.toFixed(3)}`, 12, h - 14)
-}
+})
 
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
+watch(tracer.current, redraw)
 </script>
 
 <template>

@@ -4,6 +4,9 @@
 // gravity/control torque, and a simple multi-series time-plot for the
 // integrator-comparison and PID-convergence panels.
 
+// Michigan maize -- the pendulum bob's color across every 2D panel in this deck.
+export const MAIZE = '#FFCB05'
+
 export interface LinkSpec {
   angleAbs: number   // absolute angle from the downward vertical
   length: number      // drawn length in canvas pixels

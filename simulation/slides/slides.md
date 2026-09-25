@@ -166,6 +166,16 @@ stencil. Start/Pause/Reset/Step and every parameter above are also available as 
 
 </div>
 
+<div class="history-note mt-2">
+<b>Two drawing scenes, same physics and URL parameters</b>
+<code>pendularm.html</code> renders with <code>scene.js</code>, a faithful port of the upstream
+stencil's own 4-leg table rig. A second entry point,
+<a href="/kineval/simulation/reference/pendularm_altdraw.html" target="_blank">pendularm_altdraw.html</a>,
+renders the same dynamics with <code>scene_altdraw.js</code> -- a simpler single-post stand -- and
+also shows <code>dt</code> in its status readout. Every test case below works with either entry
+point; just swap the filename.
+</div>
+
 ---
 layout: default
 ---
@@ -581,16 +591,21 @@ layout: default
 | **New:** Known-good PID | `servo=1&kp=150&kd=60&ki=4&desired=-1.0` -- the TA slide's own tuned gains | <a href="/kineval/simulation/reference/pendularm.html?servo=1&kp=150&kd=60&ki=4&desired=-1.0" target="_blank">&#9654;</a> |
 | **New:** Undamped P-only servo | `servo=1&kp=150&kd=0&ki=0&desired=-1.0` -- growing oscillation, never settles | <a href="/kineval/simulation/reference/pendularm.html?servo=1&kp=150&kd=0&ki=0&desired=-1.0" target="_blank">&#9654;</a> |
 | **New:** Chaotic double pendulum | `links=2&angle0=1.55,1.55&integrator=runge-kutta` -- released near-horizontal | <a href="/kineval/simulation/reference/pendularm.html?links=2&angle0=1.55,1.55&integrator=runge-kutta" target="_blank">&#9654;</a> |
+| **New:** Controlled double pendulum | `links=2&servo=1&desired=-1.0,1.0` -- PID on both joints, coupled dynamics and all | <a href="/kineval/simulation/reference/pendularm.html?links=2&servo=1&desired=-1.0,1.0" target="_blank">&#9654;</a> |
+| **New:** Balanced at the top | `angle0=3.141592653589793` -- released exactly inverted, undriven: a genuine unstable equilibrium, stays balanced | <a href="/kineval/simulation/reference/pendularm.html?angle0=3.141592653589793" target="_blank">&#9654;</a> |
+| **New:** 0.005 rad off balanced | `angle0=3.136592653589793` -- looks balanced at first, then swings through and re-balances on the far side | <a href="/kineval/simulation/reference/pendularm.html?angle0=3.136592653589793" target="_blank">&#9654;</a> |
 
 </div>
 
 <div class="history-note mt-2">
-<b>On the undamped P-only case</b>
-This one is worth watching longer than it looks like it needs: with no damping anywhere in the loop
-(frictionless pendulum, kd=0), a digitally-sampled P-only controller can genuinely <i>inject</i>
-energy over many cycles rather than merely fail to remove it -- a real, well-documented property of
-zero-order-hold sampled control, not just a numerical artifact. It's the clearest possible argument
-for why the derivative term exists.
+<b>Two cases worth watching longer than they look like they need</b>
+Undamped P-only (<code>kd=0</code>): a digitally-sampled P-only controller can genuinely
+<i>inject</i> energy over many cycles on a frictionless plant -- a real zero-order-hold sampling
+effect, not a numerical artifact, and the clearest argument for why the derivative term exists.
+Balanced at the top: <code>theta=pi</code> is just as valid a solution to
+<code>theta_dot_dot=-(g/l)*sin(theta)=0</code> as <code>theta=0</code> -- it's simply unstable, so
+0.005 rad off is enough for it to visibly fall, swing through the bottom, and re-balance on the far
+side after a few seconds.
 </div>
 
 ---
@@ -620,18 +635,20 @@ layout: default
 <div class="panel text-sm mt-4">
 
 The slides above cover every essential piece of the simulator's physics, but the reference
-implementation (`dynamics.js`, `scene.js`, `infrastructure.js`, `pendularm.html`, plus a locally
-vendored three.js) includes a handful of supporting pieces none of them touch directly. For
-completeness, the next few slides cover:
+implementation (`dynamics.js`, `scene.js`, `scene_altdraw.js`, `infrastructure.js`,
+`pendularm.html`, `pendularm_altdraw.html`, plus a locally vendored three.js) includes a handful of
+supporting pieces none of them touch directly. For completeness, the next few slides cover:
 
-1. **Three.js scene construction** (`scene.js`) -- the stand, camera, lighting
-2. **Rendering the pendulum each frame** (`scene.js`) -- the nested link hierarchy, vector-arrow overlays
-3. **Reading the URL parameters** (`infrastructure.js`) -- how every parameter on the earlier table gets parsed
-4. **Building the pendulum state** (`infrastructure.js`) -- turning parsed parameters into simulation state
-5. **Keyboard input** (`infrastructure.js`) -- the upstream stencil's own bindings, preserved
-6. **The HUD panel** (`infrastructure.js`) -- Start/Pause/Reset/Step and live status
-7. **The animation loop** (`infrastructure.js`) -- what calls `simulateStep()` once per frame
-8. **A responsive scene** (`infrastructure.js`, `scene.js`) -- sizing the canvas to fill its container
+1. **Three.js scene construction** (`scene.js`) -- camera, lighting, ground plane, OrbitControls
+2. **The stand and pendulum rig** (`scene.js`) -- a faithful port of the upstream stencil's own geometry
+3. **Rendering the pendulum each frame** (`scene.js`) -- the per-frame rotation.y/rotation.z drive
+4. **The altdraw variant's rotation axis** (`scene_altdraw.js`) -- why it swings about a different axis
+5. **Reading the URL parameters** (`infrastructure.js`) -- how every parameter on the earlier table gets parsed
+6. **Building the pendulum state** (`infrastructure.js`) -- turning parsed parameters into simulation state
+7. **Keyboard input** (`infrastructure.js`) -- the upstream stencil's own bindings, preserved
+8. **The HUD panel** (`infrastructure.js`) -- Start/Pause/Reset/Step and live status
+9. **The animation loop** (`infrastructure.js`) -- what calls `simulateStep()` once per frame
+10. **A responsive scene** (`infrastructure.js`, `scene.js`) -- sizing the canvas to fill its container
 
 </div>
 
@@ -642,12 +659,33 @@ layout: default
 # Appendix: three.js scene construction
 
 <div class="panel text-xs mt-2">
-A minimal orbit-able stand (one post, one crossbar) built from primitive three.js geometry --
-deliberately simpler than the upstream stencil's 4-leg table rig, since the physics is
-1D/2D-planar regardless and the stand exists only as a fixed spatial reference while orbiting.
+Camera, lighting, ground plane, and OrbitControls, then the stand and pendulum rig -- a faithful
+port of the upstream stencil's own <code>createScene()</code> (see the next slide for the stand and
+pendulum geometry itself). A current three.js release is vendored locally as ES modules, in place
+of the stencil's pinned non-module r92 build.
 </div>
 
-<<< ../reference/scene.js#create-scene {*}{lines:true,startLine:42,maxHeight:'340px'}
+<<< ../reference/scene.js#create-scene {*}{lines:true,startLine:47,maxHeight:'340px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run once before line 0.</div>
+
+---
+layout: default
+---
+
+# Appendix: the stand and pendulum rig
+
+<div class="panel text-xs mt-2">
+The 4-leg table stand is built exactly as the stencil's own <code>createScene()</code> does -- same
+legs/sidebars/crossbar hierarchy, same one-time <code>rotateOnAxis()</code> calls. The pendulum rig
+(<code>pendulum.geom</code>/<code>pendulum_link</code>/<code>pendulum_mass</code>, plus a second
+link for the double-pendulum case) is added directly to the scene rather than nested under the
+stand -- again matching the original, whose own <code>crossbar.add(pendulum.geom)</code> line is
+commented out.
+</div>
+
+<<< ../reference/scene.js#build-stand {*}{lines:true,startLine:98,maxHeight:'220px'}
+<<< ../reference/scene.js#build-pendulum-rig {*}{lines:true,startLine:136,maxHeight:'220px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run once before line 0.</div>
 
@@ -658,18 +696,37 @@ layout: default
 # Appendix: rendering the pendulum each frame
 
 <div class="panel text-xs mt-2">
-Link 2 (when present) is nested as a <i>child</i> of link 1's group so it moves with link 1's swing,
-but <code>pendulum.angle[1]</code> is an <b>absolute</b> angle from vertical, matching
-<code>doublePendulumAcceleration()</code>'s own convention -- not an angle relative to link 1. Since
-three.js composes a child's rotation with its parent's, link 2's group is updated every frame to
-<code>angle[1] - angle[0]</code>, the relative rotation that, composed with link 1's absolute
-rotation, reproduces link 2's true absolute angle in world space.
+<code>pendulum.geom.rotation.y = angle[0]</code> drives the whole assembly -- world-space, since
+<code>pendulum.geom</code> sits directly on the scene, not nested under the stand -- and for the
+double pendulum, <code>pendulum_mass.rotation.z = angle[1]</code> drives the second link on top of
+that, exactly the stencil's own two per-frame assignments (its own header comment: "second arm of
+pendulum must be in world coordinates, not parent link coordinates"). This also fixes a bug the
+reference implementation's own vector arrows had: they were being positioned and pointed every
+frame, but never actually added to the scene, so they never rendered at all.
 </div>
 
-<<< ../reference/scene.js#build-links {*}{lines:true,startLine:106,maxHeight:'220px'}
-<<< ../reference/scene.js#update-pendulum-meshes {*}{lines:true,startLine:151,maxHeight:'220px'}
+<<< ../reference/scene.js#update-pendulum-meshes {*}{lines:true,startLine:193,maxHeight:'260px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: line 10 (render pendulum at new angle).</div>
+
+---
+layout: default
+---
+
+# Appendix: the altdraw variant's rotation axis
+
+<div class="panel text-xs mt-2">
+<code>scene_altdraw.js</code>'s stand places its crossbar and pivot at the <i>same</i> position, both
+lying in the X-Y plane at <code>z=0</code>. Swinging by rotating about <b>Z</b> keeps the rod in that
+same plane for every angle -- sweeping it straight through the crossbar and post, since the pivot
+starts right at the crossbar's own location. Rotating about <b>X</b> instead sweeps the rod through
+the Y-Z plane: X stays fixed at the pivot's own position while Z varies, moving the rod away from the
+stand's geometry as soon as the angle leaves zero.
+</div>
+
+<<< ../reference/scene_altdraw.js#update-pendulum-meshes {*}{lines:true,startLine:168,maxHeight:'320px'}
+
+<div class="mt-1 text-xs opacity-60">Pseudocode: line 10 (render pendulum at new angle) -- the altdraw variant only.</div>
 
 ---
 layout: default
@@ -750,7 +807,7 @@ frame time, so the physics is deterministic and reproducible regardless of the b
 framerate, exactly as every URL-parameter test case expects.
 </div>
 
-<<< ../reference/infrastructure.js#appendix-animate {*}{lines:true,startLine:229,maxHeight:'220px'}
+<<< ../reference/infrastructure.js#appendix-animate {*}{lines:true,startLine:232,maxHeight:'220px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: line 1 (<code>every frame:</code>) -- this is what actually triggers it.</div>
 
@@ -765,7 +822,7 @@ The three.js renderer and camera are kept in sync with the container element's a
 via a <code>ResizeObserver</code>, rather than a fixed <code>width</code>/<code>height</code>.
 </div>
 
-<<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:247,maxHeight:'140px'}
-<<< ../reference/scene.js#resize-renderer {*}{lines:true,startLine:184,maxHeight:'140px'}
+<<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:250,maxHeight:'140px'}
+<<< ../reference/scene.js#resize-renderer {*}{lines:true,startLine:225,maxHeight:'140px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run at load and on resize.</div>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { pendulumAcceleration, initVerletIntegrator, integrateVerlet } from '../lib/pendulum/pendulumPhysics'
-import { drawPendulumChain, drawVerticalReference, clearCanvas } from '../lib/pendulum/drawUtils'
+import { drawPendulumChain, drawVerticalReference, clearCanvas, MAIZE } from '../lib/pendulum/drawUtils'
 import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
 
 // Basic (position-only) Verlet: the position update never reads angle_dot,
@@ -45,14 +46,8 @@ const activeLineFor: Record<Entry['phase'], number> = { accelerate: LINE_ACCEL, 
 const labelFor: Record<Entry['phase'], string> = { accelerate: 'Accelerate', integrate: 'Verlet integrate' }
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
 
-function render() {
-  const canvas = canvasEl.value
-  if (!ctx || !canvas) return
-  const w = canvas.clientWidth, h = canvas.clientHeight
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
+const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   clearCanvas(ctx, w, h)
 
   const pivotX = w / 2, pivotY = h * 0.18, linkLen = h * 0.6
@@ -60,7 +55,7 @@ function render() {
   const e = tracer.current.value
   if (!e) return
   drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle_previous, length: linkLen, color: '#9aa0a660' }], 7)
-  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: '#E8710A' }])
+  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: MAIZE }])
 
   ctx.font = '12px "Roboto Mono", monospace'
   ctx.fillStyle = '#202124'
@@ -68,10 +63,9 @@ function render() {
   ctx.fillText(`angle_previous = ${e.angle_previous.toFixed(3)}  (faint arm)`, 12, h - 46)
   ctx.fillText(`angle          = ${e.angle.toFixed(3)}`, 12, h - 30)
   ctx.fillText(`angle_next = 2*angle - angle_previous + accel*dt^2`, 12, h - 14)
-}
+})
 
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
+watch(tracer.current, redraw)
 </script>
 
 <template>

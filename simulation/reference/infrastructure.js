@@ -210,11 +210,14 @@ function buildHud(container, app) {
     return { status: status, integratorSelect: integratorSelect, servoCheckbox: servoCheckbox };
 }
 
-function renderHudStatus(statusEl, pendulum) {
+// showDt is opt-in (used by pendularm_altdraw.html only) -- the primary
+// pendularm.html's HUD omits it to stay closer to its own original design.
+function renderHudStatus(statusEl, pendulum, dt, showDt) {
     var fmt = function (arr) { return arr.map(function (v) { return v.toFixed(3); }).join(', '); };
+    var dtText = showDt ? '   dt = ' + dt.toFixed(3) + 's' : '';
     statusEl.textContent =
         'Pendularm Dynamical Simulation\n' +
-        'links = ' + pendulum.links + '   integrator = ' + pendulum.integrator + '   t = ' + pendulum.t.toFixed(2) + 's\n' +
+        'links = ' + pendulum.links + '   integrator = ' + pendulum.integrator + '   t = ' + pendulum.t.toFixed(2) + 's' + dtText + '\n' +
         'angle       = [' + fmt(pendulum.angle) + ']\n' +
         'angle_dot   = [' + fmt(pendulum.angle_dot) + ']\n' +
         'desired     = [' + fmt(pendulum.desired) + ']\n' +

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { pendulumAcceleration, integrateRK4, PID, setPIDParameters } from '../lib/pendulum/pendulumPhysics'
-import { drawPendulumChain, drawVerticalReference, clearCanvas } from '../lib/pendulum/drawUtils'
+import { drawPendulumChain, drawVerticalReference, clearCanvas, MAIZE } from '../lib/pendulum/drawUtils'
 import {
   MASTER_PSEUDOCODE, LINE_SERVO_CHECK, LINE_ERROR, LINE_PID, LINE_ELSE, LINE_ZERO_CONTROL,
   LINE_ACCEL, LINE_INTEGRATE, LINE_ADVANCE_TIME,
@@ -70,14 +71,8 @@ const labelFor: Record<Phase, string> = {
 }
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
 
-function render() {
-  const canvas = canvasEl.value
-  if (!ctx || !canvas) return
-  const w = canvas.clientWidth, h = canvas.clientHeight
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
+const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   clearCanvas(ctx, w, h)
 
   const pivotX = w / 2, pivotY = h * 0.18, linkLen = h * 0.6
@@ -89,16 +84,15 @@ function render() {
     ctx.strokeStyle = '#0d652d'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(dx, dy); ctx.stroke(); ctx.setLineDash([])
   }
-  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: '#E8710A' }])
+  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: MAIZE }])
 
   ctx.font = '12px "Roboto Mono", monospace'
   ctx.fillStyle = '#202124'
   ctx.textAlign = 'left'
   ctx.fillText(`t = ${e.t.toFixed(2)}s   angle = ${e.angle.toFixed(3)}   control = ${e.control.toFixed(1)}`, 12, h - 14)
-}
+})
 
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
+watch(tracer.current, redraw)
 function onServoToggle() { tracer.reset() }
 </script>
 

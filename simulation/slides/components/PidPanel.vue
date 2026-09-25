@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { pendulumAcceleration, integrateRK4, PID } from '../lib/pendulum/pendulumPhysics'
-import { drawPendulumChain, drawVerticalReference, drawTimeSeries, clearCanvas } from '../lib/pendulum/drawUtils'
+import { drawPendulumChain, drawVerticalReference, drawTimeSeries, clearCanvas, MAIZE } from '../lib/pendulum/drawUtils'
 import { MASTER_PSEUDOCODE, LINE_ERROR, LINE_PID, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
 
 // P -> D -> I, tuned in that order (per the AutoRob "Motion Control and
@@ -59,43 +60,32 @@ const labelFor: Record<Phase, string> = { error: 'Compute error', pid: 'PID cont
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const plotEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
-let plotCtx: CanvasRenderingContext2D | null = null
 
-function render() {
+const { redraw: redrawPendulum } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
+  clearCanvas(ctx, w, h)
   const e = tracer.current.value
   if (!e) return
+  const pivotX = w / 2, pivotY = h * 0.15, linkLen = h * 0.55
+  drawVerticalReference(ctx, pivotX, pivotY, linkLen)
+  const desiredX = pivotX + linkLen * Math.sin(desired.value), desiredY = pivotY + linkLen * Math.cos(desired.value)
+  ctx.strokeStyle = '#0d652d'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(desiredX, desiredY); ctx.stroke(); ctx.setLineDash([])
+  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: MAIZE }])
 
-  const canvas = canvasEl.value
-  if (ctx && canvas) {
-    const w = canvas.clientWidth, h = canvas.clientHeight
-    if (canvas.width !== w) canvas.width = w
-    if (canvas.height !== h) canvas.height = h
-    clearCanvas(ctx, w, h)
-    const pivotX = w / 2, pivotY = h * 0.15, linkLen = h * 0.55
-    drawVerticalReference(ctx, pivotX, pivotY, linkLen)
-    const desiredX = pivotX + linkLen * Math.sin(desired.value), desiredY = pivotY + linkLen * Math.cos(desired.value)
-    ctx.strokeStyle = '#0d652d'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(desiredX, desiredY); ctx.stroke(); ctx.setLineDash([])
-    drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: '#E8710A' }])
+  ctx.font = '12px "Roboto Mono", monospace'
+  ctx.fillStyle = '#202124'
+  ctx.textAlign = 'left'
+  ctx.fillText(`error = ${e.error.toFixed(3)}   control = ${e.control.toFixed(1)}`, 12, h - 14)
+})
 
-    ctx.font = '12px "Roboto Mono", monospace'
-    ctx.fillStyle = '#202124'
-    ctx.textAlign = 'left'
-    ctx.fillText(`error = ${e.error.toFixed(3)}   control = ${e.control.toFixed(1)}`, 12, h - 14)
-  }
+const { redraw: redrawPlot } = useCanvasRenderer(plotEl, (ctx, w, h) => {
+  const e = tracer.current.value
+  if (!e) return
+  drawTimeSeries(ctx, w, h, [{ label: 'error (rad)', color: '#c0392b', points: e.errorSeries }], { yLabel: 'error', zeroLine: true })
+})
 
-  const plot = plotEl.value
-  if (plotCtx && plot) {
-    const w = plot.clientWidth, h = plot.clientHeight
-    if (plot.width !== w) plot.width = w
-    if (plot.height !== h) plot.height = h
-    drawTimeSeries(plotCtx, w, h, [{ label: 'error (rad)', color: '#c0392b', points: e.errorSeries }], { yLabel: 'error', zeroLine: true })
-  }
-}
-
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); plotCtx = plotEl.value!.getContext('2d'); render() })
+function redraw() { redrawPendulum(); redrawPlot() }
+watch(tracer.current, redraw)
 function onGainInput() { tracer.reset() }
 </script>
 

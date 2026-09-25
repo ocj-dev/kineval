@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { pendulumAcceleration, integrateEuler, integrateVerlet, integrateVelocityVerlet, integrateRK4, initVerletIntegrator } from '../lib/pendulum/pendulumPhysics'
 import { drawTimeSeries } from '../lib/pendulum/drawUtils'
 import { MASTER_PSEUDOCODE, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
@@ -77,14 +78,8 @@ function generateFrame(): Entry[] {
 const tracer = usePhaseTracer<Entry>(generateFrame, resetSim)
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
 
-function render() {
-  const canvas = canvasEl.value
-  if (!ctx || !canvas) return
-  const w = canvas.clientWidth, h = canvas.clientHeight
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
+const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   const upto = tracer.pos.value + 1
   drawTimeSeries(ctx, w, h, [
     { label: 'Euler', color: '#c0392b', points: eulerSeries.slice(0, upto) },
@@ -92,10 +87,9 @@ function render() {
     { label: 'Verlet', color: '#1a73e8', points: verletSeries.slice(0, upto) },
     { label: 'Velocity Verlet', color: '#0d652d', points: velVerletSeries.slice(0, upto) },
   ], { yLabel: 'total energy (J)' })
-}
+})
 
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
+watch(tracer.current, redraw)
 function onDtInput() { tracer.reset() }
 </script>
 

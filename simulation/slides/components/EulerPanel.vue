@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import PhaseStepperShell from './PhaseStepperShell.vue'
 import { usePhaseTracer } from '../lib/pendulum/usePhaseTracer'
+import { useCanvasRenderer } from '../lib/pendulum/useCanvasRenderer'
 import { pendulumAcceleration, integrateEuler, integrateRK4 } from '../lib/pendulum/pendulumPhysics'
-import { drawPendulumChain, drawVerticalReference, clearCanvas } from '../lib/pendulum/drawUtils'
+import { drawPendulumChain, drawVerticalReference, clearCanvas, MAIZE } from '../lib/pendulum/drawUtils'
 import { MASTER_PSEUDOCODE, LINE_ACCEL, LINE_INTEGRATE } from '../lib/pendulum/pseudocode'
 
 // Explicit (forward) Euler against an RK4 "ghost" reference at the SAME dt,
@@ -49,14 +50,8 @@ const activeLineFor: Record<Entry['phase'], number> = { accelerate: LINE_ACCEL, 
 const labelFor: Record<Entry['phase'], string> = { accelerate: 'Accelerate', integrate: 'Euler integrate' }
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let ctx: CanvasRenderingContext2D | null = null
 
-function render() {
-  const canvas = canvasEl.value
-  if (!ctx || !canvas) return
-  const w = canvas.clientWidth, h = canvas.clientHeight
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
+const { redraw } = useCanvasRenderer(canvasEl, (ctx, w, h) => {
   clearCanvas(ctx, w, h)
 
   const pivotX = w / 2, pivotY = h * 0.18, linkLen = h * 0.6
@@ -64,7 +59,7 @@ function render() {
   const e = tracer.current.value
   if (!e) return
   drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.ghostAngle, length: linkLen, color: '#9aa0a680' }], 8)
-  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: '#E8710A' }])
+  drawPendulumChain(ctx, pivotX, pivotY, [{ angleAbs: e.angle, length: linkLen, color: MAIZE }])
 
   ctx.font = '12px "Roboto Mono", monospace'
   ctx.fillStyle = '#202124'
@@ -72,10 +67,9 @@ function render() {
   ctx.fillText(`dt = ${dtSetting.value.toFixed(3)} s`, 12, h - 46)
   ctx.fillText(`Euler theta = ${e.angle.toFixed(3)}`, 12, h - 30)
   ctx.fillText(`RK4 (ghost) theta = ${e.ghostAngle.toFixed(3)}`, 12, h - 14)
-}
+})
 
-watch(tracer.current, render)
-onMounted(() => { ctx = canvasEl.value!.getContext('2d'); render() })
+watch(tracer.current, redraw)
 function onDtInput() { tracer.reset() }
 </script>
 
@@ -93,7 +87,7 @@ function onDtInput() { tracer.reset() }
       <label class="check">
         dt <input type="range" min="0.01" max="0.35" step="0.01" v-model.number="dtSetting.value" @input="onDtInput"> {{ dtSetting.value.toFixed(2) }}s
       </label>
-      <span class="legend"><span class="dot orange" /> Euler &nbsp; <span class="dot ghost" /> RK4 (reference)</span>
+      <span class="legend"><span class="dot maize" /> Euler &nbsp; <span class="dot ghost" /> RK4 (reference)</span>
     </template>
     <div class="vector-canvas-wrap">
       <canvas ref="canvasEl" />
@@ -106,6 +100,6 @@ function onDtInput() { tracer.reset() }
 input[type="range"] { width: 7em; }
 .legend { font-family: var(--font-mono, monospace); font-size: 0.68em; }
 .dot { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; }
-.dot.orange { background: #E8710A; }
+.dot.maize { background: #FFCB05; }
 .dot.ghost { background: #9aa0a6; }
 </style>

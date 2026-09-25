@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!--|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    Pendularm Dynamical Simulation (ALTDRAW variant)
+
+    Identical physics and controls to pendularm.html -- same dynamics.js and
+    infrastructure.js -- but rendered with scene_altdraw.js's simplified
+    single-post-and-crossbar stand instead of scene.js's faithful port of the
+    upstream kineval-stencil's own 4-leg table rig. See scene_altdraw.js's
+    header for why its swing rotates about a different local axis than a
+    naive port would. The HUD here additionally displays dt, which the
+    primary pendularm.html's HUD omits.
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendularm Dynamical Simulation (altdraw) | KinEval</title>
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  #scene-container { position: absolute; inset: 0; }
+  #scene-container canvas { display: block; }
+  .pendularm-hud {
+    position: absolute; top: 12px; left: 12px; max-width: 26em;
+    background: #ffffffee; border: 1px solid #d7d9dd; border-radius: 10px;
+    box-shadow: 0 1px 3px #00000026; padding: 0.7em 0.9em;
+  }
+  .pendularm-status { margin: 0 0 0.6em; font-family: 'Roboto Mono', monospace; font-size: 0.78em; line-height: 1.45; white-space: pre-wrap; }
+  .pendularm-controls { display: flex; flex-wrap: wrap; gap: 0.4em; align-items: center; }
+  .pendularm-controls button, .pendularm-controls select {
+    font: inherit; font-size: 0.85em; padding: 0.3em 0.7em; border-radius: 6px; border: 1px solid #c7cad1; background: #fff; cursor: pointer;
+  }
+  .pendularm-controls label { font-size: 0.82em; display: flex; align-items: center; gap: 0.3em; }
+</style>
+
+<!-- import map: OrbitControls.js imports "three" as a bare specifier -->
+<script type="importmap">
+{
+  "imports": { "three": "./vendor/three/three.module.js" }
+}
+</script>
+</head>
+<body>
+
+<div id="scene-container"></div>
+
+<!-- functions completing every STENCIL section of the upstream module -->
+<script src="dynamics.js"></script>
+<script src="infrastructure.js"></script>
+
+<script type="module">
+import { createScene, updatePendulumMeshes, resizeRenderer } from './scene_altdraw.js';
+
+var params = readSimulationParams();
+var container = document.getElementById('scene-container');
+
+var app = {
+    params: params,
+    pendulum: createPendulum(params),
+    isRunning: params.autoplay,
+    stepOnce: false,
+    servoKeyHeld: false
+};
+
+var rig = createScene(container, app.pendulum);
+var keyboard = createKeyboardState();
+var hud = buildHud(container, app);
+
+app.reset = function () {
+    app.pendulum = createPendulum(params);
+    app.isRunning = params.autoplay;
+    hud.integratorSelect.value = app.pendulum.integrator;
+    hud.servoCheckbox.checked = app.pendulum.servo_active;
+};
+
+observeContainerResize(container, function () { resizeRenderer(rig, container); });
+
+createAnimationLoop(app, function () {
+    applyKeyboardBindings(keyboard, app.pendulum, app);
+    updatePendulumMeshes(rig, app.pendulum);
+    renderHudStatus(hud.status, app.pendulum, app.params.dt, true);
+    rig.controls.update();
+    rig.renderer.render(rig.scene, rig.camera);
+});
+</script>
+
+</body>
+</html>
