@@ -40,7 +40,7 @@ function init() {
     // drawing-buffer resolution is read from -- and kept in sync with --
     // its actual rendered size, rather than a fixed width/height attribute
     resizeCanvasToContainer();
-    window.onresize = resizeCanvasToContainer;
+    window.onresize = onCanvasResize;
 
     // no ground plane by default; scenes (e.g. the blob-simulation slide
     // demo) can push an additional horizontal boundary onto this array
@@ -51,6 +51,13 @@ function init() {
 
     cur_time = Date.now();
     animate();
+
+    // An embedding container (e.g. an iframe on a slide) can still be
+    // settling its own layout when this page's onload fires, without ever
+    // triggering a "resize" event afterward -- so on top of onCanvasResize()
+    // above, re-measure and rebuild once more shortly after load to correct
+    // for a too-small initial reading, same as a real resize would.
+    setTimeout(onCanvasResize, 150);
 }
 
 // #region resize-canvas
@@ -61,6 +68,20 @@ function resizeCanvasToContainer() {
     var b_rect = canvas.getBoundingClientRect();
     canvas_side_off = b_rect.left;
     canvas_top_off = b_rect.top;
+}
+
+// Embedding contexts (e.g. an iframe on a slide) can still be settling their
+// own layout when this page's onload fires, so the very first
+// resizeCanvasToContainer() call may capture a too-small (even near-zero)
+// canvas_width/height -- initCloth() would then center the grid against
+// that wrong size, leaving it built mostly (or entirely) off-canvas. Any
+// later resize (the container reaching its true final size included) both
+// re-measures the canvas AND rebuilds the cloth against the corrected
+// dimensions, rather than leaving an already-built grid stranded whatever
+// its width happened to be at construction time.
+function onCanvasResize() {
+    resizeCanvasToContainer();
+    initCloth();
 }
 // #endregion resize-canvas
 

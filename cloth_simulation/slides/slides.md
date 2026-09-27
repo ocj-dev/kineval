@@ -761,10 +761,14 @@ layout: default
 The canvas element is laid out by CSS to fill whatever space it's given -- the page, or an
 embedding iframe (see the "Try it yourself" slide) -- and its drawing-buffer resolution is read
 from, and kept in sync with, its actual rendered size, rather than a fixed
-<code>width</code>/<code>height</code> attribute.
+<code>width</code>/<code>height</code> attribute. An embedding container's own layout can still be
+settling when this page's <code>onload</code> fires, so the cloth is rebuilt (not just the canvas
+re-measured) on every resize, plus once more shortly after load as a fallback for containers that
+never fire a resize event at all -- otherwise a grid centered against a too-small initial reading
+stays stranded there even once the container reaches its true size.
 </div>
 
-<<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:57,maxHeight:'200px'}
+<<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:64,maxHeight:'260px'}
 
 <div class="mt-1 text-xs opacity-60">Pseudocode: not part of the per-frame loop -- setup code, run at load and on resize.</div>
 
