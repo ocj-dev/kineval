@@ -570,6 +570,26 @@ whole concurrent system of constraints converges toward mutual satisfaction.
 layout: default
 ---
 
+# Try it yourself
+
+<div class="content-body">
+<ClothPanel query="?node_type=rigid?edge_connection=midpoint?pin_mode=top_center" />
+</div>
+
+<!--
+Live, embedded reference implementation: the edge-midpoint hinge grid (one
+constraint per shared edge instead of two, so neighbors can pivot about it),
+anchored only at its top-center node(s) rather than the whole top row, so
+the hinging is actually visible as it hangs and sways. Drag to pull the
+cloth, right-click to cut it; edit the iframe's query string (or open a
+link on the Test cases slide next, or the parameter table slide, in a new
+tab) to try any other combination of parameters.
+-->
+
+---
+layout: default
+---
+
 # Test cases
 
 <div class="panel text-xs mt-2">
@@ -739,8 +759,9 @@ layout: default
 
 <div class="panel text-xs mt-2">
 The canvas element is laid out by CSS to fill whatever space it's given -- the page, or an
-embedding iframe -- and its drawing-buffer resolution is read from, and kept in sync with, its
-actual rendered size, rather than a fixed <code>width</code>/<code>height</code> attribute.
+embedding iframe (see the "Try it yourself" slide) -- and its drawing-buffer resolution is read
+from, and kept in sync with, its actual rendered size, rather than a fixed
+<code>width</code>/<code>height</code> attribute.
 </div>
 
 <<< ../reference/infrastructure.js#resize-canvas {*}{lines:true,startLine:57,maxHeight:'200px'}
