@@ -607,6 +607,43 @@ layout: default
 
 ---
 layout: default
+---
+
+# Explore further
+
+<div class="grid grid-cols-2 gap-6 mt-2">
+<div class="panel text-xs">
+
+**Foundations**
+
+- Andrew Witkin & David Baraff, ["Physically Based Modeling: Principles and Practice"](https://www.cs.cmu.edu/~baraff/sigcourse/) (SIGGRAPH '97 course notes) -- the classic, still-taught introduction to constrained particle and rigid-body simulation this deck's whole approach descends from.
+- Matthias Müller, Bruno Heidelberger, Marcus Hennix & John Ratcliff, ["Position Based Dynamics"](https://doi.org/10.1016/j.jvcir.2007.01.005) (2007) -- formalizes Jakobsen's relaxation approach into the PBD framework this deck's `stiffness` parameter is a simplified taste of.
+- Miles Macklin, Matthias Müller & Nuttapong Chentanez, ["XPBD: Position-Based Simulation of Compliant Constrained Dynamics"](https://doi.org/10.1145/2994258.2994272) (2016) -- makes stiffness independent of iteration count and timestep, the exact coupling this deck's `stiffness`/`accuracy` only approximate.
+
+</div>
+<div class="panel text-xs">
+
+**Modern &amp; robotics-focused**
+
+- Evan Drumwright, John Hsu, Nathan Koenig &amp; Dylan Shell, ["Extending Open Dynamics Engine for Robotics Simulation"](https://link.springer.com/chapter/10.1007/978-3-642-17319-6_7) (SIMPAR 2010) -- ODE, extended for real robot use.
+- Emanuel Todorov, Tom Erez &amp; Yuval Tassa, ["MuJoCo: A Physics Engine for Model-Based Control"](https://ieeexplore.ieee.org/abstract/document/6907751) (IROS 2012) -- the generalized-coordinate alternative to this deck's maximal-coordinate approach.
+- Tom Erez, Yuval Tassa &amp; Emanuel Todorov, ["Simulation Tools for Model-Based Robotics: Comparison of Bullet, Havok, MuJoCo, ODE and PhysX"](https://doi.org/10.1109/icra.2015.7139807) (ICRA 2015) -- how these engines actually differ in practice.
+- Jad Abou-Chakra et al., ["Embodied Gaussians"](https://openreview.net/forum?id=AEq0onGrN2) (2024) -- a current research direction: Gaussian-splat-rendered scenes driven by real physical simulation, for robotic manipulation.
+
+</div>
+</div>
+
+<!--
+Suggested additions beyond the 4 requested links: Muller et al.'s original
+PBD paper and Macklin et al.'s XPBD follow-up, since this deck's own
+approach (and its stiffness/accuracy parameters specifically) is a
+simplified instance of exactly that lineage; and Erez/Tassa/Todorov's
+engine comparison paper, a practical complement to the MuJoCo and ODE
+citations on the other side of the slide.
+-->
+
+---
+layout: default
 class: text-center
 ---
 
