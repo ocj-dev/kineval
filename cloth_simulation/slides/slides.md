@@ -157,7 +157,7 @@ Every run is configured entirely through URL parameters, extending Tearable Clot
 | `node_type` | `particle`\|`rigid` (default `particle`) | point particles, or rigid squares linked at corners |
 | `mass` | number (default `1.0`) | per-node mass -- for rigid squares this scales moment of inertia too |
 | `edge_connection` | `corners`\|`midpoint` (default `corners`) | weld adjacent squares at both corners, or hinge them at one edge-midpoint |
-| `pin_mode` | `row`\|`top_center` (default `row`) | pin the whole top row, or just its center node(s) |
+| `pin_mode` | `row`\|`top_center` (default `row`) | pin the whole top row, or an evenly-spaced band centered on it |
 | `stiffness` | 0&ndash;1 (default `0.25`) | scale on each relaxation pass's correction |
 | `michigan_colors` | `true`\|`false` (default `true`) | maize/blue block-M node coloring |
 | `wind` | `[x,y]` (default `[0,0]`) | base wind force -- gusts in magnitude/direction over time when non-zero |
@@ -579,8 +579,8 @@ layout: default
 <!--
 Live, embedded reference implementation: the edge-midpoint hinge grid (one
 constraint per shared edge instead of two, so neighbors can pivot about it),
-anchored only at its top-center node(s) rather than the whole top row, so
-the hinging is actually visible as it hangs and sways. Drag to pull the
+anchored only at a centered band of its top row (pin_mode=top_center) rather
+than the whole row, so the hinging is actually visible as it hangs and sways. Drag to pull the
 cloth, right-click to cut it; edit the iframe's query string (or open a
 link on the Test cases slide next, or the parameter table slide, in a new
 tab) to try any other combination of parameters.

@@ -49,7 +49,8 @@
         2 corner constraints per shared edge; "midpoint" uses a single
         constraint at the edge's center, so neighbors can pivot about it
       pin_mode: "row" (default) pins the entire top row; "top_center" pins
-        only the node(s) closest to the horizontal center
+        an evenly-spaced band of nodes straddling the horizontal center
+        (roughly the center 40% of the row's width)
       stiffness: 0-1 scale on the correction applied during each relaxation
         pass, for both distance and corner constraints
       michigan_colors: boolean, whether nodes are tinted maize/blue in a
