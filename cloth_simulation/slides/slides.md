@@ -156,6 +156,7 @@ Every run is configured entirely through URL parameters, extending Tearable Clot
 | `bounce` | number (default `0.5`) | restitution on wall/ground collision |
 | `node_type` | `particle`\|`rigid` (default `particle`) | point particles, or rigid squares linked at corners |
 | `mass` | number (default `1.0`) | per-node mass -- for rigid squares this scales moment of inertia too |
+| `edge_connection` | `corners`\|`midpoint` (default `corners`) | weld adjacent squares at both corners, or hinge them at one edge-midpoint |
 | `pin_mode` | `row`\|`top_center` (default `row`) | pin the whole top row, or just its center node(s) |
 | `stiffness` | 0&ndash;1 (default `0.25`) | scale on each relaxation pass's correction |
 | `michigan_colors` | `true`\|`false` (default `true`) | maize/blue block-M node coloring |
@@ -404,12 +405,15 @@ layout: default
 # Two corners, one shared edge
 
 <div class="panel text-xs mt-2">
-The rigid-body analog of the particle constraint: two corners (one on each of two adjacent
-squares) relax toward <i>coincidence</i> instead of a fixed spacing. The correction at a corner is
-split into a translation and a rotation using the standard generalized-mass point-constraint solve
-from position-based rigid body dynamics -- a documented extension with no direct precedent in
-either source material, since Jakobsen's own paper represents rigid bodies with extra "shadow"
-particles instead.
+The rigid-body analog of the particle constraint: two attachment points (one on each of two
+adjacent squares) relax toward a target distance apart, the same (dist - rest_length)/dist math as
+the particle constraint. The correction at a point is split into a translation and a rotation using
+the standard generalized-mass point-constraint solve from position-based rigid body dynamics -- a
+documented extension with no direct precedent in either source material, since Jakobsen's own
+paper represents rigid bodies with extra "shadow" particles instead. Every attachment point is one
+of <code>localCorner()</code>'s 8 offsets -- the square's 4 real corners (0-3), or the midpoints of
+its 4 edges (4-7) -- so the same correction code works whether two squares are welded at both
+corners or hinged at a single edge-midpoint (see the "Building the grid" slide).
 </div>
 
 <<< ../reference/physics.js#apply-corner-correction {*}{lines:true,startLine:255,maxHeight:'420px'}
@@ -534,8 +538,11 @@ layout: default
 Both node types share one construction: walk the grid, create a node per cell (pinning the top
 row -- for rigid squares this fixes position <i>and</i> orientation, since every integrate/relax
 function above skips pinned bodies entirely), and wire a horizontal and vertical constraint to
-each earlier neighbor -- one distance constraint for particles, or two corner constraints (one per
-shared-edge corner pair) for rigid squares.
+each earlier neighbor -- one distance constraint for particles; for rigid squares, either two
+corner constraints per shared edge (<code>edge_connection=corners</code>, the default, a rigid
+weld) or a single constraint at the edge's midpoint (<code>edge_connection=midpoint</code>, a
+hinge neighbors can still pivot about), using corner indices 4-7 -- the edge-midpoint attachment
+points <code>localCorner()</code> adds alongside the square's 4 real corners (0-3).
 </div>
 
 <<< ../reference/cloth.js#build-cloth {*}{lines:true,startLine:106,maxHeight:'420px'}
@@ -573,6 +580,7 @@ layout: default
 | Higher stiffness | `stiffness=1.0` -- a taut, less stretchy drape | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?stiffness=1.0" target="_blank">&#9654;</a> |
 | Tearable | `tear=true?michigan_colors=false` -- yank the cloth apart by hand or past `tear_dist`, plain coloring | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?tear=true?michigan_colors=false" target="_blank">&#9654;</a> |
 | Rigid-body grid | `node_type=rigid?mass=0.5` -- squares linked at their corners, half mass | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid?mass=0.5" target="_blank">&#9654;</a> |
+| Edge-midpoint hinge | `node_type=rigid?edge_connection=midpoint` -- one constraint per shared edge instead of two, so neighbors can pivot | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?node_type=rigid?edge_connection=midpoint" target="_blank">&#9654;</a> |
 | Windy flag | `wind=[2,0]?cloth_x=10?cloth_y=16` -- gusting speed/direction, with a wind-vector indicator | <a href="/kineval/cloth_simulation/reference/cloth_canvas.html?wind=[2,0]?cloth_x=10?cloth_y=16" target="_blank">&#9654;</a> |
 
 </div>

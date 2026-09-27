@@ -45,6 +45,9 @@
         particles or rigid squares linked at their corners
       mass: per-node mass (default 1.0); for rigid squares this also scales
         their moment of inertia, since I is computed from mass and half_size
+      edge_connection: "corners" (default) welds adjacent rigid squares with
+        2 corner constraints per shared edge; "midpoint" uses a single
+        constraint at the edge's center, so neighbors can pivot about it
       pin_mode: "row" (default) pins the entire top row; "top_center" pins
         only the node(s) closest to the horizontal center
       stiffness: 0-1 scale on the correction applied during each relaxation
@@ -115,6 +118,12 @@
       // Default per-node mass
       mass = 1.0;
 
+      // Default rigid-square connection: "corners" welds 2 corner
+      // constraints per shared edge (locking relative orientation);
+      // "midpoint" uses a single constraint at the edge's center instead,
+      // letting neighbors pivot about it
+      edge_connection = "corners";
+
       // Default pin pattern for the top row: "row" pins the entire top row;
       // "top_center" pins only the node(s) closest to the horizontal center
       pin_mode = "row";
@@ -134,7 +143,7 @@
       var url_parsed = window.location.href.split("?");
       for (i = 1; i < url_parsed.length; i++) {
           var param_parsed = url_parsed[i].split("=");
-          if (param_parsed[0] !== "node_type" && param_parsed[0] !== "pin_mode") {
+          if (param_parsed[0] !== "node_type" && param_parsed[0] !== "pin_mode" && param_parsed[0] !== "edge_connection") {
               eval(param_parsed[0] + "=" + param_parsed[1]);
           } else {
               eval(param_parsed[0] + "=\'" + param_parsed[1] + "\'");

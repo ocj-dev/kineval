@@ -176,14 +176,22 @@ function RigidSquare(x, y, half_size, mass) {
     this.corner_constraints = [];
 }
 
-// local-frame corner offsets, in order: 0=top-left,1=top-right,2=bottom-right,3=bottom-left
+// local-frame attachment-point offsets: 0-3 are the square's actual
+// corners (0=top-left,1=top-right,2=bottom-right,3=bottom-left, the only
+// ones drawRigidCloth() uses for rendering the square's outline); 4-7 are
+// the midpoints of its 4 edges (4=top,5=right,6=bottom,7=left), used by
+// constraints that attach to an edge's center instead of its ends.
 RigidSquare.prototype.localCorner = function (i) {
     var h = this.half_size;
     switch (i) {
         case 0: return { x: -h, y: -h };
         case 1: return { x: h, y: -h };
         case 2: return { x: h, y: h };
-        default: return { x: -h, y: h };
+        case 3: return { x: -h, y: h };
+        case 4: return { x: 0, y: -h };
+        case 5: return { x: h, y: 0 };
+        case 6: return { x: 0, y: h };
+        default: return { x: -h, y: 0 };
     }
 };
 

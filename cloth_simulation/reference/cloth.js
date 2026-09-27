@@ -105,11 +105,14 @@ function nodeColor(col, row) {
 // #region build-cloth
 // Builds the node grid and the constraints between adjacent nodes: a particle
 // grid with distance constraints (Tearable Cloth's own structure), or a
-// rigid-square grid with 2 corner constraints per shared edge (one per
-// corner pair along that edge) when node_type is "rigid" -- each held
-// corner_rest apart (the actual gap between adjacent squares' touching
-// corners at construction: spacing - 2*half_size) rather than coincident,
-// so the constraint doesn't fight the grid's own built geometry.
+// rigid-square grid when node_type is "rigid" -- either 2 corner constraints
+// per shared edge (edge_connection="corners", the default, one per corner
+// pair along that edge -- a rigid "weld" that locks relative orientation
+// between neighbors), or a single constraint at the edge's midpoint
+// (edge_connection="midpoint" -- a hinge each neighbor can still pivot
+// about). Either way each constraint is held corner_rest apart (the actual
+// gap between adjacent squares at construction: spacing - 2*half_size)
+// rather than coincident, so it doesn't fight the grid's own built geometry.
 // Either way, the top row is pinned in place -- for rigid squares this fixes
 // both position and orientation, since verletIntegrateRigid() skips pinned
 // bodies entirely. Which nodes of the top row get pinned depends on
@@ -154,7 +157,21 @@ function Cloth() {
             this.grid[row][col] = node;
             this.nodes.push(node);
 
-            if (node_type === 'rigid') {
+            if (node_type === 'rigid' && edge_connection === 'midpoint') {
+                // a single constraint at the shared edge's midpoint (corner
+                // indices 4-7 are the edge-midpoint attachment points --
+                // see RigidSquare.prototype.localCorner) instead of one at
+                // each corner: neighbors stay corner_rest apart at that one
+                // point, but remain free to pivot about it
+                if (col > 0) {
+                    var left = this.grid[row][col - 1];
+                    this.corner_constraints.push(new CornerConstraint(left, 5, node, 7, corner_rest));
+                }
+                if (row > 0) {
+                    var above = this.grid[row - 1][col];
+                    this.corner_constraints.push(new CornerConstraint(above, 6, node, 4, corner_rest));
+                }
+            } else if (node_type === 'rigid') {
                 // adjacent squares' nearest corners are held corner_rest apart
                 // -- the real gap between them at construction -- rather than
                 // coincident, so relaxation isn't fighting a pre-stretched grid
