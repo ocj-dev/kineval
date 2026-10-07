@@ -25,7 +25,7 @@ reference code lives alongside its deck at `<topic>/reference/`.
 | Forward kinematics & quaternions | [`forward_kinematics/`](forward_kinematics/) | Built |
 | Inverse kinematics & optimization | [`inverse_kinematics/`](inverse_kinematics/) | Planned |
 | RRT-Connect motion planning | [`motion_planning/`](motion_planning/) | Planned |
-| Full working KinEval viewer | [`kineval/`](kineval/) | Planned (depends on the topics above) |
+| Full working KinEval viewer | [`kineval/`](kineval/) | Forward kinematics only so far (depends on the topics above) |
 
 ## License
 

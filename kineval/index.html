@@ -1,25 +1,191 @@
 <!DOCTYPE html>
+<!--|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    Full KinEval Reference Viewer
+
+    A working port of the upstream kineval-stencil (github.com/autorob/kineval-stencil)
+    viewer (home.html + kineval/*.js), scoped for now to what the
+    forward_kinematics/, quaternion, and robot-init modules this project has
+    completed can drive: load a robot (one of three ported upstream test
+    examples, see robots/), navigate and rotate its joints interactively,
+    move its base around the ground plane, and watch forward kinematics
+    place every link in the world every frame -- same control scheme, same
+    robot.control -> applyControls -> forward-kinematics -> render loop
+    sequence as upstream's own my_animate(), just without the inverse-
+    kinematics/motion-planning/collision/dynamics modules this project
+    hasn't built yet (see ../README.md's build-order table; this page will
+    grow those controls back in as those modules land).
+
+    Not included: baxter/fetch/sawyer, upstream's three real-world robots --
+    each ships 20-35MB of STL/Collada meshes, impractical to vendor into
+    this teaching repo. ?robot=urdf_example|mr2|crawler selects among the
+    three procedural-geometry test robots upstream's own robots/ directory
+    ships alongside those three.
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Full KinEval Reference Viewer — KinEval Lab (coming soon)</title>
+<title>Full KinEval Reference Viewer</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #202124; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-  .card { background: #fff; border-radius: 16px; box-shadow: 0 2px 10px #00000022; padding: 2.5em 3em; max-width: 40em; text-align: center; }
-  h1 { margin-top: 0; }
-  .badge { display: inline-block; background: #fef3c4; color: #7a5b00; border-radius: 999px; padding: 0.3em 1em; font-size: 0.85em; font-weight: 700; margin-bottom: 1em; }
-  a { color: #1a73e8; }
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  #scene-container { position: absolute; inset: 0; }
+  #scene-container canvas { display: block; }
+  .kv-hud {
+    position: absolute; top: 12px; left: 12px; max-width: 30em;
+    background: #ffffffee; border: 1px solid #d7d9dd; border-radius: 10px;
+    box-shadow: 0 1px 3px #00000026; padding: 0.7em 0.9em;
+  }
+  .kv-status { margin: 0 0 0.5em; font-family: 'Roboto Mono', monospace; font-size: 0.78em; line-height: 1.5; white-space: pre-wrap; }
+  .kv-controls { display: flex; flex-wrap: wrap; gap: 0.4em; align-items: center; }
+  .kv-controls select, .kv-controls button {
+    font: inherit; font-size: 0.85em; padding: 0.3em 0.7em; border-radius: 6px; border: 1px solid #c7cad1; background: #fff; cursor: pointer;
+  }
+  .kv-help { font-family: 'Roboto Mono', monospace; font-size: 0.72em; line-height: 1.6; margin-top: 0.5em; }
 </style>
+
+<!-- import map: OrbitControls.js imports "three" as a bare specifier -->
+<script type="importmap">
+{
+  "imports": { "three": "./vendor/three/three.module.js" }
+}
+</script>
 </head>
 <body>
-  <div class="card">
-    <div class="badge">Planned — not yet built</div>
-    <h1>Full KinEval Reference Viewer</h1>
-    <p>The complete 3D KinEval viewer, depending on the topics above being completed first.</p>
-    <p>The 2D path-planning reference implementation is already live, though:
-    <a href="/kineval/kineval/pathplanning/">run it here</a>.</p>
-    <p><a href="/kineval/">&larr; Back to KinEval lab-session slides</a></p>
-  </div>
+
+<div id="scene-container"></div>
+
+<!-- completed forward-kinematics/quaternion STENCIL work, reused from ../forward_kinematics/ -->
+<script src="matrix.js"></script>
+<script src="quaternion.js"></script>
+<script src="kinematics.js"></script>
+
+<!-- ported upstream test robots (robots/robot_urdf_example.js, robot_mr2.js, robot_crawler.js) -->
+<script src="robots/robot_urdf_example.js"></script>
+<script src="robots/robot_mr2.js"></script>
+<script src="robots/robot_crawler.js"></script>
+
+<!-- ported upstream control/interaction layer -->
+<script src="controls.js"></script>
+<script src="userinput.js"></script>
+
+<script type="module">
+import { createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, resizeViewer } from './scene.js';
+import * as THREE from './vendor/three/three.module.js';
+
+var ROBOT_FACTORIES = {
+    urdf_example: createRobotUrdfExample,
+    mr2: createRobotMr2,
+    crawler: createRobotCrawler
+};
+
+var q = new URLSearchParams(window.location.search);
+var robotName = ROBOT_FACTORIES[q.get('robot')] ? q.get('robot') : 'crawler';
+
+var container = document.getElementById('scene-container');
+var viewer = createViewer(container);
+var keyboard = createKeyboardState();
+
+var app = { robot: null, links_geom: null, rig: null, params: { active_link: null, active_joint: null } };
+
+function loadRobot(name) {
+    if (app.robot) removeRobotMeshes(viewer, app.robot, app.rig);
+
+    var built = ROBOT_FACTORIES[name](THREE);
+    app.robot = built.robot;
+    app.links_geom = built.links_geom;
+    initRobot(app.robot);
+
+    app.params.active_link = app.robot.base;
+    app.params.active_joint = app.robot.links[app.robot.base].children[0];
+
+    app.rig = buildRobotMeshes(viewer, app.robot, app.links_geom);
+    robotForwardKinematics(app.robot);
+    updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
+
+    initKeyEvents(app.robot, app.params);
+}
+
+loadRobot(robotName);
+
+var hud = document.createElement('div');
+hud.className = 'kv-hud';
+container.appendChild(hud);
+var status = document.createElement('pre');
+status.className = 'kv-status';
+hud.appendChild(status);
+
+var controlsRow = document.createElement('div');
+controlsRow.className = 'kv-controls';
+hud.appendChild(controlsRow);
+
+var robotSelect = document.createElement('select');
+Object.keys(ROBOT_FACTORIES).forEach(function (name) {
+    var opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    if (name === robotName) opt.selected = true;
+    robotSelect.appendChild(opt);
+});
+robotSelect.addEventListener('change', function () {
+    robotName = robotSelect.value;
+    loadRobot(robotName);
+});
+controlsRow.appendChild(robotSelect);
+
+var helpBtn = document.createElement('button');
+helpBtn.textContent = 'Help (v)';
+var helpEl = document.createElement('div');
+helpEl.className = 'kv-help';
+helpEl.style.display = 'none';
+helpEl.innerHTML = HELP_TEXT;
+helpBtn.addEventListener('click', function () { helpEl.style.display = helpEl.style.display === 'none' ? 'block' : 'none'; });
+controlsRow.appendChild(helpBtn);
+hud.appendChild(helpEl);
+
+window.addEventListener('keydown', function (e) {
+    if (e.key.toLowerCase() === 'v') helpEl.style.display = helpEl.style.display === 'none' ? 'block' : 'none';
+});
+
+function renderHudStatus() {
+    var r = app.robot;
+    status.textContent =
+        'Full KinEval Reference Viewer\n' +
+        'robot = ' + r.name + '   active joint = ' + app.params.active_joint + '\n' +
+        'base xyz = [' + r.origin.xyz.map(function (v) { return v.toFixed(2); }).join(', ') + ']' +
+        '   rpy = [' + r.origin.rpy.map(function (v) { return v.toFixed(2); }).join(', ') + ']\n' +
+        'joint angle = ' + r.joints[app.params.active_joint].angle.toFixed(3);
+}
+
+function frame() {
+    requestAnimationFrame(frame);
+    applyControls(app.robot);
+    handleUserInput(app.robot, app.params, keyboard, viewer.camera);
+    robotForwardKinematics(app.robot);
+    updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
+    renderHudStatus();
+    viewer.controls.update();
+    viewer.renderer.render(viewer.scene, viewer.camera);
+}
+requestAnimationFrame(frame);
+
+window.addEventListener('resize', function () { resizeViewer(viewer, container); });
+</script>
+
 </body>
 </html>
