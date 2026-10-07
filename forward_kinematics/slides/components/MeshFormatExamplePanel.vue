@@ -31,11 +31,18 @@ onMounted(() => {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0xf5f5f5)
-  const camera = new THREE.PerspectiveCamera(45, el.clientWidth / el.clientHeight, 0.01, 50)
+  // el.clientWidth/clientHeight are not yet reliable here -- onMounted fires
+  // right after this element is inserted into the DOM, often before the
+  // browser has run the layout pass that gives its flex/grid ancestors
+  // (content-body -> split-panel -> side-image) their actual pixel sizes,
+  // especially when mounting as part of a larger batch of slide-transition
+  // DOM insertions. Seed the camera/renderer with a placeholder aspect and
+  // let the ResizeObserver below (which fires once real layout is known,
+  // and again on every subsequent resize) set the real size.
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 50)
   camera.position.set(2, 1.6, 2.2)
 
   renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(el.clientWidth, el.clientHeight)
   renderer.setPixelRatio(window.devicePixelRatio || 1)
   el.appendChild(renderer.domElement)
 
@@ -75,17 +82,18 @@ onMounted(() => {
   }
   frame()
 
-  const onResize = () => {
-    if (!renderer) return
-    camera.aspect = el.clientWidth / el.clientHeight
+  const resizeObserver = new ResizeObserver((entries) => {
+    const { width, height } = entries[0].contentRect
+    if (width === 0 || height === 0 || !renderer) return
+    camera.aspect = width / height
     camera.updateProjectionMatrix()
-    renderer.setSize(el.clientWidth, el.clientHeight)
-  }
-  window.addEventListener('resize', onResize)
+    renderer.setSize(width, height)
+  })
+  resizeObserver.observe(el)
 
   onBeforeUnmount(() => {
     cancelAnimationFrame(animationHandle)
-    window.removeEventListener('resize', onResize)
+    resizeObserver.disconnect()
     renderer?.dispose()
   })
 })

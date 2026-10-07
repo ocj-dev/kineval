@@ -295,6 +295,7 @@ layout: default
 
 # Geometry format: STL
 
+<div class="content-body">
 <div class="split-panel">
 <div>
 
@@ -315,6 +316,7 @@ information at all. Common use: **3D-printing and CAD export**, rarely a final r
 <div class="side-caption">live three.js render, via STLLoader -- public/meshes/sample_tetrahedron.stl</div>
 </div>
 </div>
+</div>
 
 ---
 layout: default
@@ -322,6 +324,7 @@ layout: default
 
 # Geometry format: Collada (.dae)
 
+<div class="content-body">
 <div class="split-panel">
 <div>
 
@@ -343,6 +346,7 @@ multi-part assets** carried between different authoring/rendering tools.
 <div class="side-caption">live three.js render, via ColladaLoader -- public/meshes/sample_tetrahedron.dae</div>
 </div>
 </div>
+</div>
 
 ---
 layout: default
@@ -350,6 +354,7 @@ layout: default
 
 # Geometry format: OBJ
 
+<div class="content-body">
 <div class="split-panel">
 <div>
 
@@ -369,6 +374,7 @@ format** between modeling tools and renderers.
 <MeshFormatExamplePanel format="obj" mesh-url="/meshes/sample_cube.obj" :color="0x3b6ea5" />
 </div>
 <div class="side-caption">live three.js render, via OBJLoader -- public/meshes/sample_cube.obj</div>
+</div>
 </div>
 </div>
 
@@ -456,7 +462,9 @@ and the schematic tree assemble itself link by link.
 
 </div>
 
+<div class="content-body">
 <MatrixStackPanel robot-name="mobile_arm" />
+</div>
 
 ---
 layout: default
@@ -523,7 +531,9 @@ drag the angle and watch the point (gray) rotate to its image (amber).
 
 </div>
 
+<div class="content-body">
 <ComplexRotation2DPanel />
+</div>
 
 ---
 layout: default
@@ -539,7 +549,9 @@ point (gray) rotate to its image (amber) around the dashed axis line.
 
 </div>
 
+<div class="content-body">
 <QuaternionRotation3DPanel />
+</div>
 
 ---
 layout: default
@@ -573,7 +585,9 @@ joint" loop more than once, which the single-chain `mobile_arm` never does.
 
 </div>
 
+<div class="content-body">
 <MatrixStackPanel robot-name="urdf_example" />
+</div>
 
 ---
 layout: default
@@ -655,23 +669,23 @@ layout: default
 <div class="panel text-sm">
 
 Every test case is a plain hyperlink into <code>forward_kinematics.html</code>, same convention as
-every other module in this project:
+every other module in this project -- click any URL below to open that test case in a new tab:
 
 </div>
 
-<div class="panel" style="font-size:0.74em">
+<div class="panel test-case-table" style="font-size:0.74em">
 
 | Test case | URL |
 |---|---|
-| `mobile_arm`, default pose | `?robot=mobile_arm` |
-| `mobile_arm`, posed via sliders | `?robot=mobile_arm&angles=0.785,-0.524` |
-| `urdf_example`, branching tree | `?robot=urdf_example` |
-| Mobile base translated + yawed | `?robot=mobile_arm&base_x=1&base_z=-0.5&base_yaw=0.6` |
-| **New 1**: arm fully extended | `?robot=mobile_arm&angles=0,0` |
-| **New 2**: arm folded back on itself | `?robot=mobile_arm&angles=1.5708,3.1416` |
-| **New 3**: `urdf_example`'s two branches at extremes | `?robot=urdf_example&angles=1.5708,-1.5708,1.5708` |
-| **New 4**: slow step-through for projection | `?robot=urdf_example&step_ms=1500` |
-| **New 5**: base far from world origin, arm swept | `?robot=mobile_arm&base_x=-2&base_z=2&angles=-1.2,0.8` |
+| `mobile_arm`, default pose | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm" target="_blank">?robot=mobile_arm</a> |
+| `mobile_arm`, posed via sliders | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&angles=0.785,-0.524" target="_blank">?robot=mobile_arm&angles=0.785,-0.524</a> |
+| `urdf_example`, branching tree | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=urdf_example" target="_blank">?robot=urdf_example</a> |
+| Mobile base translated + yawed | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&base_x=1&base_z=-0.5&base_yaw=0.6" target="_blank">?robot=mobile_arm&base_x=1&base_z=-0.5&base_yaw=0.6</a> |
+| **New 1**: arm fully extended | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&angles=0,0" target="_blank">?robot=mobile_arm&angles=0,0</a> |
+| **New 2**: arm folded back on itself | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&angles=1.5708,3.1416" target="_blank">?robot=mobile_arm&angles=1.5708,3.1416</a> |
+| **New 3**: `urdf_example`'s two branches at extremes | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=urdf_example&angles=1.5708,-1.5708,1.5708" target="_blank">?robot=urdf_example&angles=1.5708,-1.5708,1.5708</a> |
+| **New 4**: slow step-through for projection | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=urdf_example&step_ms=1500" target="_blank">?robot=urdf_example&step_ms=1500</a> |
+| **New 5**: base far from world origin, arm swept | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&base_x=-2&base_z=2&angles=-1.2,0.8" target="_blank">?robot=mobile_arm&base_x=-2&base_z=2&angles=-1.2,0.8</a> |
 
 </div>
 

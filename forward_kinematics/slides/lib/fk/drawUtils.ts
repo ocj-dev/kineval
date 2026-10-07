@@ -38,10 +38,10 @@ export interface FkEdge { parent: string; child: string }
 export function drawFkTree(
   ctx: CanvasRenderingContext2D, width: number, height: number,
   revealed: Map<string, Mat4>, edges: FkEdge[], highlightName: string | null,
-  scale = 90,
+  scale = 220,
 ) {
   clearCanvas(ctx, width, height)
-  const originPx: [number, number] = [width / 2, height * 0.72]
+  const originPx: [number, number] = [width * 0.3, height * 0.55]
 
   const screenOf = (name: string): [number, number] | null => {
     const m = revealed.get(name)
