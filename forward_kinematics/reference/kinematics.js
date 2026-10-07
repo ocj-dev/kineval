@@ -184,12 +184,18 @@ function traverseFKLink(robot, linkName, matrix) {
 function traverseFKBase(robot) {
     var baseOrigin = matrix_from_origin(robot.origin);
 
-    // heading (local +z) and lateral (local +x) directions of the robot
-    // base in world coordinates, as 4x1 homogeneous direction vectors
-    // (w=0, so translation doesn't affect them) -- used by the HUD/camera,
-    // not by the kinematic tree itself
-    robot.heading = matrix_multiply(baseOrigin, [[0], [0], [1], [0]]);
-    robot.lateral = matrix_multiply(baseOrigin, [[1], [0], [0], [0]]);
+    // heading (local +z) and lateral (local +x) of the robot base, as 4x1
+    // homogeneous POINTS one unit ahead of / beside the base in world
+    // coordinates (w=1, so the base's own translation IS included). The
+    // upstream stencil comment calls these "directions", but its own
+    // consumer -- kineval_userinput.js's w/s/q/e base driving -- reads them
+    // as `heading[2][0] - robot.origin.xyz[2]`, subtracting the base
+    // position back off to recover the direction. That subtraction only
+    // yields a heading if these are points: with w=0 the base's position
+    // leaks into the result and "forward" stops pointing forward as soon
+    // as the robot drives away from the world origin.
+    robot.heading = matrix_multiply(baseOrigin, [[0], [0], [1], [1]]);
+    robot.lateral = matrix_multiply(baseOrigin, [[1], [0], [0], [1]]);
 
     traverseFKLink(robot, robot.base, baseOrigin);
 }

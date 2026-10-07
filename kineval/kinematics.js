@@ -111,8 +111,15 @@ function traverseFKLink(robot, linkName, xform) {
 function traverseFKBase(robot) {
     var baseOrigin = matrix_from_origin(robot.origin);
 
-    robot.heading = matrix_multiply(baseOrigin, [[0], [0], [1], [0]]);
-    robot.lateral = matrix_multiply(baseOrigin, [[1], [0], [0], [0]]);
+    // 4x1 homogeneous POINTS one unit ahead of / beside the base in world
+    // coordinates (w=1, so the base's own translation is included) -- see
+    // ../forward_kinematics/reference/kinematics.js for why these are
+    // points and not directions: userinput.js's w/s/q/e base driving
+    // recovers the direction by subtracting robot.origin.xyz back off, so
+    // with w=0 "forward" stops pointing forward once the base drives away
+    // from the world origin.
+    robot.heading = matrix_multiply(baseOrigin, [[0], [0], [1], [1]]);
+    robot.lateral = matrix_multiply(baseOrigin, [[1], [0], [0], [1]]);
 
     traverseFKLink(robot, robot.base, baseOrigin);
 }

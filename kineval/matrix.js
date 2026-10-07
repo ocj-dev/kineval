@@ -143,12 +143,14 @@ function matrix_square_invert(m) {
 // #region matrix-pseudoinverse
 function matrix_pseudoinverse(m) {
     // returns the Moore-Penrose pseudoinverse of (possibly non-square) m,
-    // via the normal equations: for an overdetermined/tall m (more rows
-    // than columns, the common case for a robot Jacobian stacked by DOF),
+    // via the normal equations. For a TALL m (more rows than columns --
+    // an overdetermined system, e.g. a Jacobian for an arm with fewer
+    // joints than the task has dimensions), the left form applies:
     //     pinv(m) = inv(m^T m) m^T
-    // for a wide m (more columns than rows, e.g. an end-effector Jacobian
-    // with more joints than task DOFs -- the case inverse_kinematics/ will
-    // actually call this for), the left form is singular, so instead
+    // For a WIDE m (more columns than rows -- a redundant arm, more joints
+    // than task dimensions, which is the usual case for the end-effector
+    // Jacobians inverse_kinematics/ will feed this), m^T m is singular, so
+    // the right form applies instead:
     //     pinv(m) = m^T inv(m m^T)
     // Not used by forward kinematics itself -- included here only because
     // it's one of the matrix.js STENCIL functions, for the inverse_kinematics

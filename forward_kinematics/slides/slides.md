@@ -53,9 +53,11 @@ Unlike this project's dynamics and path-planning decks, the AutoRob matrix-stack
 open with a named historical figure for *this* technique -- the matrix stack itself is standard
 computer-graphics machinery (the same push/pop composition OpenGL's old fixed-function pipeline
 used for scene graphs), applied here to a robot's kinematic tree instead of a 3D scene. What the
-lecture does credit by name is the **Denavit-Hartenberg (D-H) convention** -- introduced "in recent
-years" as the field moved toward **URDF** instead, because URDF's link/joint tree is, in the
-lecture's own words, "amenable to matrix stack recursion." The frame-labeling notation used
+lecture does credit by name is the **Denavit-Hartenberg (D-H) convention** -- **Jacques Denavit**
+and **Richard Hartenberg**, 1955 -- which the lecture calls the *traditional* way to define a
+robot's kinematics, with **URDF** the one the field has moved to "in recent years", because
+URDF's link/joint tree is, in the lecture's own words, "amenable to matrix stack recursion."
+The frame-labeling notation used
 throughout both lectures is explicitly attributed to the **Spong textbook** (*Robot Modeling and
 Control*), kept "consistent" with it on purpose so the two notations never clash.
 
@@ -196,11 +198,13 @@ layout: default
 <div class="panel text-sm" style="font-size:0.78em">
 
 A real URDF (Unified Robot Description Format) file is XML. Every `<link>` can carry up to three
-separate descriptions of its geometry -- **visual** (what's rendered), **collision** (what a planner
-checks against), and **inertial** (mass and inertia, for dynamics) -- each independently specifiable,
-because a robot's visual mesh is often far more detailed than what collision-checking or dynamics
-needs. Every `<joint>` names its parent/child link, a **fixed** `<origin>` offset, and (for a movable
-joint) a rotation/translation **`<axis>`**.
+independent descriptions of its physical extent: **`<visual>`** (what's rendered) and
+**`<collision>`** (what a planner checks against) each hold their own `<geometry>`, specifiable
+separately because a robot's visual mesh is usually far more detailed than collision-checking
+wants; **`<inertial>`** holds no geometry at all -- just `<mass>` and the `<inertia>` tensor,
+which a modeller typically *derives* from a geometry rather than storing one. Every `<joint>`
+names its parent/child link, a **fixed** `<origin>` offset, and (for a movable joint) a
+rotation/translation **`<axis>`**; `revolute` joints additionally require a **`<limit>`**.
 
 </div>
 
@@ -254,6 +258,9 @@ future `motion_planning/` (RRT) module.
   <child link="arm_link1"/>
   <origin xyz="0 0.25 0" rpy="0 0 0"/>
   <axis xyz="0 1 0"/>
+  <!-- required for revolute -->
+  <limit lower="-3.14" upper="3.14"
+         effort="100" velocity="10"/>
 </joint>
 ```
 
@@ -440,10 +447,11 @@ layout: default
 
 <div class="panel text-sm" style="margin-top:0.5em">
 
-Composition is always **parent-left, child-right**: `matrix_multiply(parentMatrix, localOffset)` --
-pre-multiplying, exactly the convention both AutoRob lectures use (`T<sub>ij</sub>`, composed
-outward from the base). Order matters: matrix multiplication does not commute, and neither does
-3D rotation.
+Composition is always **parent-left, child-right**: `matrix_multiply(parentMatrix, localOffset)`,
+exactly the convention both AutoRob lectures use (`T<sub>ij</sub>`, composed outward from the
+base). With column vectors the **rightmost matrix acts on the point first**, so the child's own
+local offset is applied before the parent's transform carries it out into the world. Order
+matters: matrix multiplication does not commute, and neither does 3D rotation.
 
 </div>
 
@@ -654,7 +662,7 @@ and **[Lynch &amp; Park 2017]** respectively), without a worked example in eithe
 <div class="history-note">
 <b>Beyond URDF: USD</b>
 Universal Scene Description (USD) is <em>not</em> a mesh-geometry format comparable to STL/Collada/
-OBJ -- URDF's <code>&lt;mesh filename&gt;</code> never points at a <code>.usd</code>. It's a whole-
+OBJ -- the standard ROS URDF mesh loaders don't consume <code>.usd</code> at all. It's a whole-
 <em>scene</em> description format (materials, variants, animation) that competes with URDF+SDF at
 the robot-description level, increasingly relevant in robotics simulation (NVIDIA Isaac Sim/
 Omniverse) but outside this module's scope.
@@ -698,9 +706,15 @@ layout: default
 <div class="panel text-sm">
 
 Every transform above is a **4&times;4 homogeneous matrix** acting on a **homogeneous 4&times;1
-column vector** `[x,y,z,1]^T` (or `[x,y,z,0]^T` for a direction, like `robot.heading`) -- the extra
-coordinate is what lets a single matrix multiply express translation *and* rotation together.
-`matrix_multiply` (shown earlier) is the one operation every composition in this module reduces to.
+column vector**: `[x,y,z,1]^T` for a **point**, `[x,y,z,0]^T` for a **direction** -- the extra
+coordinate is what lets a single matrix multiply express translation *and* rotation together, and
+the `w = 0` case is what makes a direction immune to the translation part. `matrix_multiply`
+(shown earlier) is the one operation every composition in this module reduces to.
+
+Getting that `w` wrong is a real trap: `robot.heading`/`robot.lateral` look like directions (the
+upstream stencil's own comment calls them that), but their consumer subtracts the base position
+back off them, so they have to be built as **points** -- `w = 1`. Built with `w = 0` instead,
+"drive forward" silently stops pointing forward the moment the robot leaves the world origin.
 
 </div>
 
