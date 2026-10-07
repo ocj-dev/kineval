@@ -22,7 +22,7 @@ reference code lives alongside its deck at `<topic>/reference/`.
 | A-star path planning | [`pathfinding/`](pathfinding/) | Built |
 | 2D cloth simulation | [`cloth_simulation/`](cloth_simulation/) | Built |
 | Pendularm dynamical simulation | [`simulation/`](simulation/) | Built |
-| Forward kinematics & quaternions | [`forward_kinematics/`](forward_kinematics/) | Planned |
+| Forward kinematics & quaternions | [`forward_kinematics/`](forward_kinematics/) | Built |
 | Inverse kinematics & optimization | [`inverse_kinematics/`](inverse_kinematics/) | Planned |
 | RRT-Connect motion planning | [`motion_planning/`](motion_planning/) | Planned |
 | Full working KinEval viewer | [`kineval/`](kineval/) | Planned (depends on the topics above) |

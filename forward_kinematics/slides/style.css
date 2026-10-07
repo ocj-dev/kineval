@@ -1,0 +1,275 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --paper: #f5f6f8;
+  --ink: #1a1a1a;
+  --amber: #E8710A;
+  --amber-dark: #b85a08;
+  --indigo: #202B4E;
+  --indigo-light: #34447a;
+  --font-display: 'Roboto', system-ui, sans-serif;
+  --font-mono: 'Roboto Mono', 'JetBrains Mono', monospace;
+  --font-body: 'Roboto', system-ui, sans-serif;
+
+  /* Force Slidev's inline-code styling to this deck's light theme
+     regardless of the viewer's browser/OS dark-mode preference -- the
+     headmatter's `colorSchema: light` already does this, but this is a
+     defense-in-depth override so inline `code` never renders as
+     near-black-on-dark text if that's ever bypassed. */
+  --slidev-code-background: #f5f5f5;
+  --slidev-code-foreground: #1b1b1b;
+}
+html.dark {
+  --slidev-code-background: #f5f5f5 !important;
+  --slidev-code-foreground: #1b1b1b !important;
+}
+
+.slidev-layout {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.content-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.slidev-layout h1 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  font-size: 2.5em;
+  line-height: 1.08;
+}
+.slidev-layout h1 .accent {
+  color: var(--indigo);
+}
+
+.slidev-layout h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 3px solid var(--amber);
+  margin-bottom: 0.5em;
+  padding-bottom: 0.15em;
+  font-size: 1.6em;
+  display: inline-block;
+}
+
+.slidev-layout h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--indigo);
+  font-size: 1.25em;
+  margin: 0 0 0.2em;
+}
+
+/* soft, rounded white card -- used for every text block */
+.panel {
+  border: 1px solid #dcdfe6;
+  box-shadow: 0 1px 2px #00000026, 0 1px 3px 1px #00000014;
+  background: #ffffffee;
+  border-radius: 12px;
+  padding: 0.9em 1.1em;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  border: 1px solid var(--indigo);
+  color: var(--indigo);
+  background: #fdecd9;
+  border-radius: 999px;
+  margin-right: 0.4em;
+  padding: 0.2em 0.75em;
+  font-size: 0.7em;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.history-note {
+  font-family: var(--font-body);
+  font-size: 0.8em;
+  line-height: 1.4;
+  border: 1px dashed #cbb28e;
+  border-radius: 10px;
+  background: #ffffffb0;
+  padding: 0.6em 0.8em;
+}
+.history-note b {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72em;
+  color: var(--indigo);
+  display: block;
+  margin-bottom: 0.25em;
+}
+
+.panel p { margin: 0.35em 0; }
+.panel ul { margin: 0.3em 0; padding-left: 1.1em; }
+.panel li { margin: 0.15em 0; }
+.panel table { font-size: 0.82em; border-collapse: collapse; width: 100%; }
+.panel table th, .panel table td { padding: 0.22em 0.6em; }
+.panel table tr:first-child th { padding-top: 0; }
+
+.title-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.6em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+}
+.nav-hint {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--indigo);
+}
+.credit {
+  font-family: var(--font-mono);
+  font-size: 0.68em;
+  opacity: 0.6;
+}
+
+/* amber/indigo swatch pair used as title-slide chrome, standing in for the
+   gravity-torque/control-torque vector coloring the reference
+   implementation itself renders */
+.swatch-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 1px 6px #00000033;
+  padding: 0.5em 1em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--ink);
+}
+.swatch-bar .swatch {
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid #00000022;
+}
+.swatch-bar .swatch.amber { background: var(--amber); }
+.swatch-bar .swatch.indigo { background: var(--indigo); }
+
+.btn {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 0.8em;
+  padding: 0.55em 1.1em;
+  border-radius: 999px;
+  border: 1px solid #d8cdb8;
+  background: #fff;
+  color: var(--indigo);
+  cursor: pointer;
+  box-shadow: 0 1px 2px #00000026;
+  transition: box-shadow 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  box-shadow: 0 1px 3px 1px #00000024;
+  background: #faf7ec;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.primary {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #fff;
+}
+.btn.primary:hover:not(:disabled) { background: var(--indigo-light); }
+
+.image-slide {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+}
+.hero-image {
+  max-width: 100%;
+  max-height: 76%;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px #00000033;
+}
+.image-caption {
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: var(--indigo);
+  font-size: 2em;
+  letter-spacing: -0.01em;
+}
+.image-credit {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  opacity: 0.65;
+}
+
+/* two-pane slides: text on one side, a photo or collage on the other */
+.split-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  gap: 1em;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+.split-panel > div {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.split-panel .side-image {
+  flex: 1 1 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px #00000033;
+  display: flex;
+  min-height: 0;
+}
+.split-panel .side-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
+}
+.split-panel .side-caption {
+  font-family: var(--font-mono);
+  font-size: 0.65em;
+  opacity: 0.7;
+  margin-top: 0.4em;
+}
+.meaning {
+  display: inline-block;
+  margin-top: 0.15em;
+  font-size: 0.85em;
+  font-style: italic;
+  opacity: 0.65;
+}
+
+/* vector-arrow / phase-plot canvas used across the interactive step-through panels */
+.vector-canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.vector-canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

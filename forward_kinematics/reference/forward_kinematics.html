@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!--|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    Forward Kinematics and Quaternions
+
+    COMPLETED REFERENCE IMPLEMENTATION for the AutoRob (autorob.org) lab-session
+    slides. A completed, from-scratch reference implementation of the upstream
+    kineval-stencil (github.com/autorob/kineval-stencil) forward-kinematics and
+    quaternion modules: the matrix-stack/quaternion composition of a robot's
+    kinematic tree, rendered as an orbit-able three.js scene whose link meshes
+    are posed directly from the computed transforms (see scene.js's header for
+    why that's not left to three.js's own scene-graph nesting). Runs
+    standalone, no build step -- every run is configured through URL
+    parameters (see infrastructure.js#appendix-url-params).
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forward Kinematics and Quaternions | KinEval</title>
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  #scene-container { position: absolute; inset: 0; }
+  #scene-container canvas { display: block; }
+  .fk-hud {
+    position: absolute; top: 12px; left: 12px; max-width: 28em;
+    background: #ffffffee; border: 1px solid #d7d9dd; border-radius: 10px;
+    box-shadow: 0 1px 3px #00000026; padding: 0.7em 0.9em;
+  }
+  .fk-status { margin: 0 0 0.6em; font-family: 'Roboto Mono', monospace; font-size: 0.76em; line-height: 1.45; white-space: pre-wrap; }
+  .fk-controls { display: flex; flex-wrap: wrap; gap: 0.4em; align-items: center; margin-bottom: 0.5em; }
+  .fk-controls button, .fk-controls select {
+    font: inherit; font-size: 0.85em; padding: 0.3em 0.7em; border-radius: 6px; border: 1px solid #c7cad1; background: #fff; cursor: pointer;
+  }
+  .fk-joint-sliders { display: flex; flex-direction: column; gap: 0.3em; }
+  .fk-joint-row { display: flex; align-items: center; gap: 0.5em; font-size: 0.8em; }
+  .fk-joint-row span { width: 9em; font-family: 'Roboto Mono', monospace; }
+  .fk-joint-row input[type="range"] { flex: 1 1 auto; }
+</style>
+
+<!-- import map: OrbitControls.js (and the mesh-format loaders) import "three" as a bare specifier -->
+<script type="importmap">
+{
+  "imports": { "three": "./vendor/three/three.module.js" }
+}
+</script>
+</head>
+<body>
+
+<div id="scene-container"></div>
+
+<!-- functions completing every STENCIL section of the upstream modules -->
+<script src="matrix.js"></script>
+<script src="quaternion.js"></script>
+<script src="kinematics.js"></script>
+<script src="robots/mobile_arm.urdf.js"></script>
+<script src="robots/urdf_example.js"></script>
+<script src="infrastructure.js"></script>
+
+<script type="module">
+import { createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, revealLinksUpTo, resizeRenderer } from './scene.js';
+
+var container = document.getElementById('scene-container');
+var viewer = createViewer(container);
+
+var app = {
+    params: readFKParams(),
+    robot: null,
+    fkOrder: null,
+    stepIndex: -1,
+    isRunning: false,
+    stepOnce: false
+};
+
+var hud = buildHud(container, app);
+
+app.recompute = function () {
+    buildFKTransforms(app.robot);
+    updateRobotMeshes(viewer, app.robot);
+};
+
+app.reset = function () {
+    removeRobotMeshes(viewer);
+    app.robot = createRobotFromParams(app.params);
+    buildFKTransforms(app.robot);           // compute every link/joint matrix once, up front
+    app.fkOrder = recordFKTraversalOrder(app.robot);
+    app.stepIndex = -1;
+    buildRobotMeshes(viewer, app.robot);
+    updateRobotMeshes(viewer, app.robot);   // mesh.matrix set now; visibility still false until stepped
+    rebuildJointSliders(hud, app);
+    app.isRunning = app.params.autoplay;
+};
+
+app.reset();
+app.isRunning = app.params.autoplay;
+
+createAnimationLoop(app, function () {
+    revealLinksUpTo(viewer, app.fkOrder, app.stepIndex);
+    renderHudStatus(hud.status, app);
+    viewer.controls.update();
+    viewer.renderer.render(viewer.scene, viewer.camera);
+});
+
+window.addEventListener('resize', function () { resizeRenderer(viewer, container); });
+</script>
+
+</body>
+</html>

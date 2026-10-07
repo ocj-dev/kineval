@@ -1,0 +1,16 @@
+{
+  "name": "kineval-forward-kinematics",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "slidev --open",
+    "build": "slidev build --base /kineval/forward_kinematics/",
+    "export": "slidev export"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.19.1",
+    "@slidev/theme-default": "^0.25.0",
+    "three": "^0.186.0",
+    "vue": "^3.5.42"
+  }
+}
