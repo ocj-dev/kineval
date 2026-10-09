@@ -15,9 +15,11 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js'
 
 // Live three.js-rendered example geometry for each mesh-file-format slide
-// (STL/Collada/OBJ) -- one small hand-authored sample asset per format
-// under public/meshes/ (see that directory's own note), loaded with the
-// matching three.js loader at runtime, not a screenshot.
+// (STL/Collada/OBJ). Each asset under public/meshes/ is a REAL robot mesh
+// that some real URDF names in a <mesh filename="...">: Fetch's wheel and
+// head-pan link, and Spot's lower leg (neither Fetch nor PR2 ships OBJ --
+// see that directory's README). Loaded with the matching three.js loader at
+// runtime, not a screenshot.
 
 const props = defineProps<{ format: 'stl' | 'obj' | 'collada'; meshUrl: string; color?: number }>()
 
@@ -58,19 +60,55 @@ onMounted(() => {
   scene.add(group)
   const material = new THREE.MeshLambertMaterial({ color: props.color ?? 0xd98236 })
 
+  // These are real robot meshes, so they arrive at real-world scale (a Fetch
+  // wheel is ~0.1m, a Spot leg ~0.3m) and with arbitrary modelling origins --
+  // Spot's leg in particular sits well off its own origin. Recentre and pull
+  // the camera back to the bounding sphere so every format's example frames
+  // itself identically regardless of its units or origin.
+  //
+  // Note this shifts the LOADED OBJECT within `group`, not `group` itself:
+  // the animation loop spins `group`, so anything still offset from the
+  // group's origin would swing around it instead of turning in place.
+  function frameObject(object: any) {
+    const box = new THREE.Box3().setFromObject(object)
+    if (box.isEmpty()) return
+    const centre = box.getCenter(new THREE.Vector3())
+    object.position.sub(centre)
+
+    const radius = box.getBoundingSphere(new THREE.Sphere()).radius || 1
+    const dist = radius / Math.sin((camera.fov * Math.PI) / 180 / 2)
+    camera.position.set(dist * 0.62, dist * 0.5, dist * 0.68)
+    camera.near = dist / 100
+    camera.far = dist * 100
+    camera.updateProjectionMatrix()
+    controls.target.set(0, 0, 0)
+    controls.update()
+  }
+
+  // resolve against the deck's deployed base path (the built deck is served
+  // from /kineval/forward_kinematics/, not the site root, so a bare
+  // "/meshes/..." would 404 once deployed)
+  const url = import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + props.meshUrl.replace(/^\//, '')
+
   if (props.format === 'stl') {
-    new STLLoader().load(props.meshUrl, (geometry: any) => {
-      geometry.center()
-      group.add(new THREE.Mesh(geometry, material))
+    new STLLoader().load(url, (geometry: any) => {
+      const mesh = new THREE.Mesh(geometry, material)
+      group.add(mesh)
+      frameObject(mesh)
     })
   } else if (props.format === 'obj') {
-    new OBJLoader().load(props.meshUrl, (obj: any) => {
+    new OBJLoader().load(url, (obj: any) => {
       obj.traverse((child: any) => { if (child.isMesh) child.material = material })
       group.add(obj)
+      frameObject(obj)
     })
   } else {
-    new ColladaLoader().load(props.meshUrl, (result: any) => {
+    // Collada carries its own materials/textures -- deliberately left intact
+    // here rather than overridden, since that capability is the point of the
+    // format's slide.
+    new ColladaLoader().load(url, (result: any) => {
       group.add(result.scene)
+      frameObject(result.scene)
     })
   }
 

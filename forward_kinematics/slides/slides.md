@@ -312,15 +312,20 @@ layout: default
 own facet normal and three vertices, **no shared-vertex indexing, no color, no hierarchy**. That
 makes it trivial to parse and universally supported (every 3D printer and CAD tool reads it), but
 wasteful (every triangle repeats its vertices in full) and visually bare -- no material or texture
-information at all. Common use: **3D-printing and CAD export**, rarely a final rendered asset.
+information at all. Common use: **3D-printing and CAD export**, and -- because a format with no
+material data costs nothing to strip down -- **collision geometry**.
+
+The wheel on the right is Fetch's real `l_wheel_link.STL`. Fetch leans on exactly that split:
+`fetch.urdf` points `<visual>` at this file and `<collision>` at a *separate*, coarser
+`l_wheel_link_collision.STL` -- the same link, two meshes, two jobs.
 
 </div>
 </div>
 <div>
 <div class="side-image" style="background:#f5f5f5">
-<MeshFormatExamplePanel format="stl" mesh-url="/meshes/sample_tetrahedron.stl" :color="0xd98236" />
+<MeshFormatExamplePanel format="stl" mesh-url="meshes/fetch_l_wheel_link.STL" :color="0xd98236" />
 </div>
-<div class="side-caption">live three.js render, via STLLoader -- public/meshes/sample_tetrahedron.stl</div>
+<div class="side-caption">live three.js render via STLLoader &mdash; Fetch's <code>l_wheel_link.STL</code>, straight out of <code>fetch.urdf</code></div>
 </div>
 </div>
 </div>
@@ -339,18 +344,22 @@ layout: default
 
 **Collada** is an XML scene-interchange format -- a mesh's vertices/faces live inside a
 `<library_geometries>` block, but a .dae file can also carry materials, a full **node hierarchy**,
-skeletal rigging, and animation, which is why several robots in the upstream kineval-stencil
-(baxter, fetch, sawyer) ship their visual meshes as .dae. The tradeoff for that richness is a much
-more verbose, harder-to-hand-author file than STL or OBJ. Common use: **richly-textured, rigged, or
-multi-part assets** carried between different authoring/rendering tools.
+skeletal rigging, and animation, which is why Baxter, Fetch and Sawyer all ship their *visual*
+meshes as .dae. The tradeoff for that richness is a much more verbose, harder-to-hand-author file
+than STL or OBJ. Common use: **richly-textured, rigged, or multi-part assets** carried between
+different authoring/rendering tools.
+
+The head on the right is Fetch's real `head_pan_link.dae`, and note what the STL slide's wheel
+could not do: it arrives **already textured**, because the file names its own image
+(`head_pan_uv.png`) internally. Nothing in this deck assigns it a material.
 
 </div>
 </div>
 <div>
 <div class="side-image" style="background:#f5f5f5">
-<MeshFormatExamplePanel format="collada" mesh-url="/meshes/sample_tetrahedron.dae" :color="0x27966b" />
+<MeshFormatExamplePanel format="collada" mesh-url="meshes/fetch_head_pan_link.dae" :color="0x27966b" />
 </div>
-<div class="side-caption">live three.js render, via ColladaLoader -- public/meshes/sample_tetrahedron.dae</div>
+<div class="side-caption">live three.js render via ColladaLoader &mdash; Fetch's <code>head_pan_link.dae</code>, <b>with its own texture</b>, which STL could not carry</div>
 </div>
 </div>
 </div>
@@ -374,13 +383,18 @@ almost universally supported. It has no hierarchy or animation, and materials li
 companion `.mtl` file rather than inline. Common use: a **lowest-common-denominator exchange
 format** between modeling tools and renderers.
 
+Worth noticing which robot this one came from: **neither Fetch nor PR2 ships a single `.obj`** --
+both are STL + Collada throughout. The leg on the right is Spot's
+`front_left_lower_leg.obj`. In a URDF pipeline OBJ is the format you meet when a mesh arrives
+from outside the ROS ecosystem, rather than the one roboticists reach for first.
+
 </div>
 </div>
 <div>
 <div class="side-image" style="background:#f5f5f5">
-<MeshFormatExamplePanel format="obj" mesh-url="/meshes/sample_cube.obj" :color="0x3b6ea5" />
+<MeshFormatExamplePanel format="obj" mesh-url="meshes/spot_front_left_lower_leg.obj" :color="0x3b6ea5" />
 </div>
-<div class="side-caption">live three.js render, via OBJLoader -- public/meshes/sample_cube.obj</div>
+<div class="side-caption">live three.js render via OBJLoader &mdash; Spot's <code>front_left_lower_leg.obj</code> (not Fetch or PR2: neither ships OBJ)</div>
 </div>
 </div>
 </div>
@@ -398,7 +412,7 @@ layout: default
 
 </div>
 
-<<< ../reference/kinematics.js#forward-kinematics {js}{lines:true,startLine:117,maxHeight:'420px'}
+<<< ../reference/kinematics.js#forward-kinematics {*}{lines:true,startLine:117,maxHeight:'420px'}
 
 ---
 layout: default
@@ -433,9 +447,9 @@ own XYZ order: **R = R<sub>z</sub>(yaw) R<sub>y</sub>(pitch) R<sub>x</sub>(roll)
 
 </div>
 
-<<< ../reference/matrix.js#generate-translation-matrix {js}{lines:true,startLine:241,maxHeight:'140px'}
-<<< ../reference/kinematics.js#matrix-from-rpy {js}{lines:true,startLine:118,maxHeight:'140px'}
-<<< ../reference/kinematics.js#matrix-from-origin {js}{lines:true,startLine:132,maxHeight:'100px'}
+<<< ../reference/matrix.js#generate-translation-matrix {*}{lines:true,startLine:241,maxHeight:'140px'}
+<<< ../reference/kinematics.js#matrix-from-rpy {*}{lines:true,startLine:118,maxHeight:'140px'}
+<<< ../reference/kinematics.js#matrix-from-origin {*}{lines:true,startLine:132,maxHeight:'100px'}
 
 ---
 layout: default
@@ -443,7 +457,7 @@ layout: default
 
 # Matrix multiplication, composing the stack
 
-<<< ../reference/matrix.js#matrix-multiply {js}{lines:true,startLine:51,maxHeight:'300px'}
+<<< ../reference/matrix.js#matrix-multiply {*}{lines:true,startLine:51,maxHeight:'300px'}
 
 <div class="panel text-sm" style="margin-top:0.5em">
 
@@ -480,7 +494,7 @@ layout: default
 
 # `traverseFKJoint`: fixed offset, then variable motion
 
-<<< ../reference/kinematics.js#traverse-fk-joint {js}{lines:true,startLine:139,maxHeight:'420px'}
+<<< ../reference/kinematics.js#traverse-fk-joint {*}{lines:true,startLine:139,maxHeight:'420px'}
 
 ---
 layout: default
@@ -488,8 +502,8 @@ layout: default
 
 # `traverseFKLink` and `traverseFKBase`
 
-<<< ../reference/kinematics.js#traverse-fk-link {js}{lines:true,startLine:169,maxHeight:'220px'}
-<<< ../reference/kinematics.js#traverse-fk-base {js}{lines:true,startLine:181,maxHeight:'220px'}
+<<< ../reference/kinematics.js#traverse-fk-link {*}{lines:true,startLine:169,maxHeight:'220px'}
+<<< ../reference/kinematics.js#traverse-fk-base {*}{lines:true,startLine:181,maxHeight:'220px'}
 
 ---
 layout: default
@@ -506,8 +520,8 @@ stack like any other transform.
 
 </div>
 
-<<< ../reference/quaternion.js#quaternion-from-axisangle {js}{lines:true,startLine:33,maxHeight:'200px'}
-<<< ../reference/quaternion.js#quaternion-to-rotation-matrix {js}{lines:true,startLine:76,maxHeight:'200px'}
+<<< ../reference/quaternion.js#quaternion-from-axisangle {*}{lines:true,startLine:33,maxHeight:'200px'}
+<<< ../reference/quaternion.js#quaternion-to-rotation-matrix {*}{lines:true,startLine:76,maxHeight:'200px'}
 
 ---
 layout: default
@@ -515,7 +529,7 @@ layout: default
 
 # Quaternion multiplication: composing rotations
 
-<<< ../reference/quaternion.js#quaternion-multiply {js}{lines:true,startLine:62,maxHeight:'260px'}
+<<< ../reference/quaternion.js#quaternion-multiply {*}{lines:true,startLine:62,maxHeight:'260px'}
 
 <div class="panel text-sm" style="margin-top:0.5em">
 
@@ -576,7 +590,7 @@ in that same plane, independent of the arm.
 
 </div>
 
-<<< ../reference/robots/mobile_arm.urdf.js#create-mobile-arm-robot {js}{lines:true,startLine:45,maxHeight:'380px'}
+<<< ../reference/robots/mobile_arm.urdf.js#create-mobile-arm-robot {*}{lines:true,startLine:45,maxHeight:'380px'}
 
 ---
 layout: default
@@ -718,7 +732,7 @@ back off them, so they have to be built as **points** -- `w = 1`. Built with `w 
 
 </div>
 
-<<< ../reference/matrix.js#matrix-invert-affine {js}{lines:true,startLine:167,maxHeight:'260px'}
+<<< ../reference/matrix.js#matrix-invert-affine {*}{lines:true,startLine:167,maxHeight:'260px'}
 
 <div class="panel text-sm" style="margin-top:0.4em">
 A rigid transform's inverse is cheap because its rotation block is <b>orthonormal</b>
@@ -732,8 +746,8 @@ layout: default
 
 # Appendix: cross product, normalization, pseudoinverse
 
-<<< ../reference/matrix.js#vector-cross {js}{lines:true,startLine:218,maxHeight:'140px'}
-<<< ../reference/matrix.js#vector-normalize {js}{lines:true,startLine:201,maxHeight:'140px'}
+<<< ../reference/matrix.js#vector-cross {*}{lines:true,startLine:218,maxHeight:'140px'}
+<<< ../reference/matrix.js#vector-normalize {*}{lines:true,startLine:201,maxHeight:'140px'}
 
 <div class="panel text-sm" style="margin-top:0.4em">
 
@@ -743,7 +757,7 @@ will need to turn a Jacobian into a joint-velocity update.
 
 </div>
 
-<<< ../reference/matrix.js#matrix-pseudoinverse {js}{lines:true,startLine:143,maxHeight:'220px'}
+<<< ../reference/matrix.js#matrix-pseudoinverse {*}{lines:true,startLine:143,maxHeight:'220px'}
 
 ---
 layout: default
@@ -761,9 +775,9 @@ external linear-algebra dependency possible.
 
 </div>
 
-<<< ../reference/matrix.js#matrix-copy {js}{lines:true,startLine:36,maxHeight:'140px'}
-<<< ../reference/matrix.js#matrix-transpose {js}{lines:true,startLine:70,maxHeight:'140px'}
-<<< ../reference/matrix.js#matrix-square-invert {js}{lines:true,startLine:85,maxHeight:'280px'}
+<<< ../reference/matrix.js#matrix-copy {*}{lines:true,startLine:36,maxHeight:'140px'}
+<<< ../reference/matrix.js#matrix-transpose {*}{lines:true,startLine:70,maxHeight:'140px'}
+<<< ../reference/matrix.js#matrix-square-invert {*}{lines:true,startLine:85,maxHeight:'280px'}
 
 ---
 layout: default
@@ -771,10 +785,10 @@ layout: default
 
 # Appendix: the rest of the matrix.js STENCIL
 
-<<< ../reference/matrix.js#generate-identity {js}{lines:true,startLine:229,maxHeight:'120px'}
-<<< ../reference/matrix.js#generate-rotation-matrix-x {js}{lines:true,startLine:253,maxHeight:'140px'}
-<<< ../reference/matrix.js#generate-rotation-matrix-y {js}{lines:true,startLine:266,maxHeight:'140px'}
-<<< ../reference/matrix.js#generate-rotation-matrix-z {js}{lines:true,startLine:279,maxHeight:'140px'}
+<<< ../reference/matrix.js#generate-identity {*}{lines:true,startLine:229,maxHeight:'120px'}
+<<< ../reference/matrix.js#generate-rotation-matrix-x {*}{lines:true,startLine:253,maxHeight:'140px'}
+<<< ../reference/matrix.js#generate-rotation-matrix-y {*}{lines:true,startLine:266,maxHeight:'140px'}
+<<< ../reference/matrix.js#generate-rotation-matrix-z {*}{lines:true,startLine:279,maxHeight:'140px'}
 
 ---
 layout: default
@@ -790,9 +804,9 @@ joint connects a link back to its own parent.
 
 </div>
 
-<<< ../reference/kinematics.js#init-robot-links {js}{lines:true,startLine:75,maxHeight:'140px'}
-<<< ../reference/kinematics.js#init-robot-joints {js}{lines:true,startLine:87,maxHeight:'220px'}
-<<< ../reference/kinematics.js#init-robot {js}{lines:true,startLine:111,maxHeight:'80px'}
+<<< ../reference/kinematics.js#init-robot-links {*}{lines:true,startLine:75,maxHeight:'140px'}
+<<< ../reference/kinematics.js#init-robot-joints {*}{lines:true,startLine:87,maxHeight:'220px'}
+<<< ../reference/kinematics.js#init-robot {*}{lines:true,startLine:111,maxHeight:'80px'}
 
 ---
 layout: default
@@ -800,8 +814,8 @@ layout: default
 
 # Appendix: `quaternion_normalize` and `buildFKTransforms`
 
-<<< ../reference/quaternion.js#quaternion-normalize {js}{lines:true,startLine:51,maxHeight:'160px'}
-<<< ../reference/kinematics.js#build-fk-transforms {js}{lines:true,startLine:196,maxHeight:'100px'}
+<<< ../reference/quaternion.js#quaternion-normalize {*}{lines:true,startLine:51,maxHeight:'160px'}
+<<< ../reference/kinematics.js#build-fk-transforms {*}{lines:true,startLine:196,maxHeight:'100px'}
 
 ---
 layout: default
@@ -818,8 +832,8 @@ driving the picture, not three.js's own scene graph.
 
 </div>
 
-<<< ../reference/scene.js#make-link-geometry {js}{lines:true,startLine:47,maxHeight:'220px'}
-<<< ../reference/scene.js#create-viewer {js}{lines:true,startLine:72,maxHeight:'380px'}
+<<< ../reference/scene.js#make-link-geometry {*}{lines:true,startLine:47,maxHeight:'220px'}
+<<< ../reference/scene.js#create-viewer {*}{lines:true,startLine:72,maxHeight:'380px'}
 
 ---
 layout: default
@@ -827,8 +841,8 @@ layout: default
 
 # Appendix: posing and revealing link meshes
 
-<<< ../reference/scene.js#update-robot-meshes {js}{lines:true,startLine:153,maxHeight:'380px'}
-<<< ../reference/scene.js#resize-renderer {js}{lines:true,startLine:193,maxHeight:'100px'}
+<<< ../reference/scene.js#update-robot-meshes {*}{lines:true,startLine:153,maxHeight:'380px'}
+<<< ../reference/scene.js#resize-renderer {*}{lines:true,startLine:193,maxHeight:'100px'}
 
 ---
 layout: default
@@ -836,7 +850,7 @@ layout: default
 
 # Appendix: URL parameters and robot selection
 
-<<< ../reference/infrastructure.js#appendix-url-params {js}{lines:true,startLine:36,maxHeight:'420px'}
+<<< ../reference/infrastructure.js#appendix-url-params {*}{lines:true,startLine:36,maxHeight:'420px'}
 
 ---
 layout: default
@@ -853,8 +867,8 @@ instead of a clock.
 
 </div>
 
-<<< ../reference/infrastructure.js#fk-traversal-order {js}{lines:true,startLine:81,maxHeight:'220px'}
-<<< ../reference/infrastructure.js#appendix-animate {js}{lines:true,startLine:214,maxHeight:'180px'}
+<<< ../reference/infrastructure.js#fk-traversal-order {*}{lines:true,startLine:81,maxHeight:'220px'}
+<<< ../reference/infrastructure.js#appendix-animate {*}{lines:true,startLine:214,maxHeight:'180px'}
 
 ---
 layout: default
@@ -862,7 +876,7 @@ layout: default
 
 # Appendix: the HUD panel and joint sliders
 
-<<< ../reference/infrastructure.js#hud-panel {js}{lines:true,startLine:111,maxHeight:'420px'}
+<<< ../reference/infrastructure.js#hud-panel {*}{lines:true,startLine:111,maxHeight:'420px'}
 
 ---
 layout: default
@@ -878,7 +892,7 @@ child joints), unlike the single-chain `mobile_arm`.
 
 </div>
 
-<<< ../reference/robots/urdf_example.js#create-urdf-example-robot {js}{lines:true,startLine:36,maxHeight:'380px'}
+<<< ../reference/robots/urdf_example.js#create-urdf-example-robot {*}{lines:true,startLine:36,maxHeight:'380px'}
 
 ---
 layout: center
