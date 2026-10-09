@@ -5,16 +5,18 @@
 
     Forward Kinematics and Quaternions | Robot description: mobile_arm
 
-    A new robot for this module: a single mobile-base link with a 2-joint
-    planar arm mounted on top (3 links total -- base_link, arm_link1,
-    arm_link2 -- matching the lab brief's "simple 3-link mobile robot with a
-    single base link and a mounted planar arm"). Both arm joints rotate
-    about the same (world "up", +y in kineval/three.js coordinates) axis, so
-    the whole arm sweeps within one horizontal plane as it moves -- the
-    "planar arm" part -- while the base link's own world pose (robot.origin)
-    is free to translate/rotate anywhere in that same plane, the "mobile"
-    part. See forward_kinematics.html's URL parameters for moving the base
-    and driving each joint angle.
+    A new robot for this module: a mobile base carrying a pitching mast with
+    a 2-joint planar arm on top (base_link, mast_link, arm_link1,
+    arm_link2), after the lab brief's "simple mobile robot with a single
+    base link and a mounted planar arm".
+
+    Every joint turns about the lateral +z axis, so the arm is planar in a
+    VERTICAL plane -- it reaches up and out rather than sweeping a
+    horizontal turntable -- and joint_pitch tilts the mast, and with it that
+    whole plane, nose-up/nose-down. The base link's own world pose
+    (robot.origin) stays free to translate/rotate on the ground plane, which
+    is the "mobile" part. See forward_kinematics.html's URL parameters for
+    moving the base and driving each joint angle.
 
     This is KinEval's own JSON convenience representation of a URDF
     <visual> tree, NOT an XML parser input -- see the deck's "URDF <visual>
@@ -58,6 +60,12 @@ function createMobileArmRobot() {
                 geometry: { type: 'box', size: [0.6, 0.2, 0.6], offset: { xyz: [0, 0, 0], rpy: [0, 0, 0] } },
                 color: 0x3b6ea5
             },
+            mast_link: {
+                // short post the arm is mounted on; joint_pitch tilts it, and
+                // the whole arm with it
+                geometry: { type: 'box', size: [0.12, 0.3, 0.12], offset: { xyz: [0, 0.15, 0], rpy: [0, 0, 0] } },
+                color: 0x27966b
+            },
             arm_link1: {
                 // spans from joint1 (this link's own origin) to joint2, 0.5 along local +x
                 geometry: { type: 'box', size: [0.5, 0.08, 0.08], offset: { xyz: [0.25, 0, 0], rpy: [0, 0, 0] } },
@@ -70,16 +78,27 @@ function createMobileArmRobot() {
             }
         },
 
+        // Every joint turns about the LATERAL axis (+z), so every one of them
+        // moves within the same vertical x-y plane: joint_pitch tilts the mast
+        // (and therefore the whole arm) nose-up/nose-down, and the two arm
+        // joints articulate the arm itself inside that same vertical plane --
+        // a reaching arm rather than the horizontal turntable sweep an
+        // all-about-+y version would give.
         joints: {
+            joint_pitch: {
+                parent: 'base_link', child: 'mast_link', type: 'revolute',
+                origin: { xyz: [0, 0.1, 0], rpy: [0, 0, 0] },
+                axis: [0, 0, 1], angle: 0
+            },
             joint1: {
-                parent: 'base_link', child: 'arm_link1', type: 'revolute',
-                origin: { xyz: [0, 0.25, 0], rpy: [0, 0, 0] },
-                axis: [0, 1, 0], angle: 0
+                parent: 'mast_link', child: 'arm_link1', type: 'revolute',
+                origin: { xyz: [0, 0.3, 0], rpy: [0, 0, 0] },
+                axis: [0, 0, 1], angle: 0
             },
             joint2: {
                 parent: 'arm_link1', child: 'arm_link2', type: 'revolute',
                 origin: { xyz: [0.5, 0, 0], rpy: [0, 0, 0] },
-                axis: [0, 1, 0], angle: 0
+                axis: [0, 0, 1], angle: 0
             }
         },
 

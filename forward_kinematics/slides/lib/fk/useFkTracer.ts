@@ -5,7 +5,7 @@
 // angle slider changes, to re-trace under the new pose.
 import { ref, computed, onBeforeUnmount, type Ref } from 'vue'
 import { fkSteps } from './fkSteps'
-import type { FKStep, Mat4, RobotDesc } from './types'
+import type { FKStep, FKFrame, Mat4, RobotDesc } from './types'
 
 interface TraceEntry {
   step: FKStep
@@ -32,6 +32,8 @@ export function useFkTracer(speedMs: Ref<number> = ref(400)) {
   const currentJointName = ref<string | null>(null)
   const depth = ref(0)
   const revealedLinks = ref<Map<string, Mat4>>(new Map())
+  const stack = ref<FKFrame[]>([])
+  const currentMatrix = ref<Mat4 | null>(null)
   const isRunning = ref(false)
   const pos = ref(-1)
   const stepCount = ref(0)
@@ -50,6 +52,8 @@ export function useFkTracer(speedMs: Ref<number> = ref(400)) {
       currentJointName.value = null
       depth.value = 0
       revealedLinks.value = new Map()
+      stack.value = []
+      currentMatrix.value = null
       return
     }
     const entry = trace[p]
@@ -58,6 +62,8 @@ export function useFkTracer(speedMs: Ref<number> = ref(400)) {
     currentJointName.value = entry.step.jointName ?? null
     depth.value = entry.step.depth
     revealedLinks.value = entry.revealed
+    stack.value = entry.step.stack
+    currentMatrix.value = entry.step.matrix ?? null
   }
 
   function load(robot: RobotDesc) {
@@ -108,7 +114,7 @@ export function useFkTracer(speedMs: Ref<number> = ref(400)) {
   onBeforeUnmount(() => pause())
 
   return {
-    activeLine, currentLinkName, currentJointName, depth, revealedLinks,
+    activeLine, currentLinkName, currentJointName, depth, revealedLinks, stack, currentMatrix,
     isRunning, isDone, isAtStart, pos, stepCount,
     load, play, pause, reset, stepForward, stepBack,
   }

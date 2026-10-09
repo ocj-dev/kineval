@@ -77,23 +77,152 @@ layout: default
 
 # A brief history of axis-angle rotation: Rodrigues
 
+<div class="content-body">
+<div class="split-panel">
+<div>
+
 <div class="panel text-sm">
 
-Before quaternions, there was a cleaner way to rotate a vector by an angle about an arbitrary axis
-than three stacked Euler-angle rotations: the **Rodrigues rotation formula**, named for
-**Benjamin Olinde Rodrigues (1795-1851)**. Split any vector **b** into components parallel and
-perpendicular to the rotation axis **a**, rotate only the perpendicular part, and recombine:
+Before quaternions, there was a cleaner way to rotate a vector about an arbitrary axis than three
+stacked Euler-angle rotations: the **Rodrigues rotation formula**, named for **Benjamin Olinde
+Rodrigues (1795-1851)**. Split **b** into parts parallel and perpendicular to the axis **a**,
+rotate only the perpendicular part, recombine:
 
-<div class="panel" style="margin-top:0.6em">
+<div class="panel" style="margin-top:0.5em; font-size:1.05em">
 
 **b&prime; = (1 &minus; cos&theta;)(a&middot;b)a + b cos&theta; + (a&times;b) sin&theta;**
 
 </div>
 
-This is the same "axis + angle" idea `quaternion_from_axisangle` in this module's reference
-implementation is built from -- Rodrigues' formula can be written directly as a rotation matrix (via
-a skew-symmetric matrix of the axis and an outer-product term), and a quaternion built from an
-axis and an angle is, underneath, encoding exactly this formula in four numbers instead of nine.
+Each term is drawn on the right. Green **(a&middot;b)a** is the part of **b** lying *along* the
+axis, which the rotation never touches -- that is why **b&prime;** rides a circle, not a sphere.
+Purple **(a&times;b) sin&theta;** gives the second perpendicular direction needed to sweep the
+rest of **b** round. The next two slides unpack the **skew-symmetric matrix** and **outer product**
+this becomes as a matrix.
+
+</div>
+</div>
+<div>
+<RodriguesPanel />
+</div>
+</div>
+</div>
+
+---
+layout: default
+---
+
+# The cross product as a matrix: skew-symmetric form
+
+<div class="panel text-sm">
+
+The **a&times;b** term above is a *vector* operation, but Rodrigues' formula is on its way to
+becoming a *matrix*. The bridge is that crossing with a fixed vector is a **linear** operation, so
+it can be written as a matrix acting on **b**. That matrix is the **skew-symmetric matrix** of
+**a**, written **[a]<sub>&times;</sub>**:
+
+</div>
+
+<div class="split-panel" style="margin-top:0.4em">
+<div>
+
+<div class="panel">
+
+**[a]<sub>&times;</sub> =**
+
+| | | |
+|---|---|---|
+| 0 | &minus;a<sub>z</sub> | a<sub>y</sub> |
+| a<sub>z</sub> | 0 | &minus;a<sub>x</sub> |
+| &minus;a<sub>y</sub> | a<sub>x</sub> | 0 |
+
+so that **[a]<sub>&times;</sub> b = a &times; b** for every **b**.
+
+</div>
+</div>
+<div>
+
+<div class="panel text-sm">
+
+"Skew-symmetric" means **[a]<sub>&times;</sub><sup>T</sup> = &minus;[a]<sub>&times;</sub>** --
+transposing it flips every sign. Two consequences worth keeping:
+
+- the diagonal must be zero (only 0 equals its own negation), so it carries just **3** independent
+  numbers, exactly the 3 in **a**
+- **a &times; a = 0** falls straight out, which is the algebraic version of "a rotation leaves its
+  own axis alone"
+
+This module's `vector_cross` computes the same thing directly, without ever forming the matrix --
+cheaper when you only need one product.
+
+</div>
+</div>
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+With it, Rodrigues collapses to the **matrix** form
+**R = I + sin&theta; [a]<sub>&times;</sub> + (1 &minus; cos&theta;) [a]<sub>&times;</sub><sup>2</sup>**
+-- a rotation matrix built from an axis and an angle, no Euler stack anywhere.
+
+</div>
+
+---
+layout: default
+---
+
+# The outer product: projecting onto the axis
+
+<div class="panel text-sm">
+
+The other term, **(a&middot;b)a**, is also linear in **b**, and it gets the same treatment. The
+**outer product** **a a<sup>T</sup>** multiplies a 3&times;1 by a 1&times;3 to give a **3&times;3
+matrix** -- the mirror image of the inner (dot) product **a<sup>T</sup>a**, which multiplies the
+same two the other way round to give a single **scalar**.
+
+</div>
+
+<div class="split-panel" style="margin-top:0.4em">
+<div>
+
+<div class="panel">
+
+**a a<sup>T</sup> =**
+
+| | | |
+|---|---|---|
+| a<sub>x</sub>a<sub>x</sub> | a<sub>x</sub>a<sub>y</sub> | a<sub>x</sub>a<sub>z</sub> |
+| a<sub>y</sub>a<sub>x</sub> | a<sub>y</sub>a<sub>y</sub> | a<sub>y</sub>a<sub>z</sub> |
+| a<sub>z</sub>a<sub>x</sub> | a<sub>z</sub>a<sub>y</sub> | a<sub>z</sub>a<sub>z</sub> |
+
+**(a a<sup>T</sup>) b = a (a&middot;b) = (a&middot;b) a**
+
+</div>
+</div>
+<div>
+
+<div class="panel text-sm">
+
+For a **unit** **a**, **a a<sup>T</sup>** is a **projection matrix**: it throws away everything
+perpendicular to **a** and keeps only the part along it -- precisely the green vector on the
+Rodrigues panel. Its properties follow from that reading:
+
+- **idempotent**: (a a<sup>T</sup>)(a a<sup>T</sup>) = a a<sup>T</sup>. Projecting twice is the
+  same as projecting once
+- **rank 1**: every output is a multiple of **a**, so the matrix flattens all of 3D onto one line
+- and **I &minus; a a<sup>T</sup>** is the complementary projection, keeping only the perpendicular
+  part -- the part the rotation actually moves
+
+</div>
+</div>
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+Writing Rodrigues with both pieces gives its third equivalent form:
+**R = cos&theta; I + sin&theta; [a]<sub>&times;</sub> + (1 &minus; cos&theta;) a a<sup>T</sup>** --
+"keep a bit of the original, swing some of it with the cross product, and leave the axis-parallel
+part untouched", stated in matrices.
 
 </div>
 
@@ -124,18 +253,14 @@ the same idea.
 </div>
 <div>
 
-<div class="history-note" style="height:100%">
-<b>The plaque</b>
-
-<div style="font-style:italic; margin:0.4em 0;">
-"Here as he walked by on the 16th of October 1843 Sir William Rowan Hamilton in a flash of genius
-discovered the fundamental formula for quaternion multiplication<br>
-i&sup2; = j&sup2; = k&sup2; = ijk = &minus;1<br>
-&amp; cut it on a stone of this bridge."
+<div class="side-image">
+<img src="/images/hamilton_quaternion_plaque.jpg" alt="Stone plaque on Broom Bridge, Dublin, reading: Here as he walked by on the 16th of October 1843 Sir William Rowan Hamilton in a flash of genius discovered the fundamental formula for quaternion multiplication i squared equals j squared equals k squared equals ijk equals minus one and cut it on a stone of this bridge" />
 </div>
-
-&mdash; Broom (Brougham) Bridge, Dublin
-
+<div class="side-caption">
+The plaque on Broom (Brougham) Bridge, Dublin &mdash; <i>"&hellip;discovered the fundamental formula
+for quaternion multiplication i&sup2; = j&sup2; = k&sup2; = ijk = &minus;1 &amp; cut it on a stone
+of this bridge."</i><br>
+Photo: Dwmalone, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, via Wikimedia Commons
 </div>
 </div>
 </div>
@@ -146,25 +271,31 @@ layout: default
 
 # Why not just Euler angles? Gimbal lock
 
+<div class="content-body">
+<div class="split-panel">
+<div>
+
 <div class="panel text-sm">
 
-Three stacked axis rotations -- **R = R<sub>z</sub>(&theta;<sub>z</sub>) R<sub>y</sub>(&theta;<sub>y</sub>)
-R<sub>x</sub>(&theta;<sub>x</sub>)**, AutoRob's own XYZ order -- are the most direct way to build a
-3D rotation, and the one this module's `matrix_from_rpy` uses for every *fixed* `<origin rpy="...">`
-offset. But driving a robot joint's own *variable* rotation this way has a real failure mode:
-**gimbal lock**, where two of the three axes rotate into alignment and a full 3 degrees of freedom
-collapses to 2. The lecture demonstrates it two ways: symbolically, setting the middle angle
-&theta;<sub>y</sub> = 90&deg; collapses the stacked matrix to a single effective axis; and
-physically, with a "shoulder" example -- applying **R<sub>z</sub>(90&deg;) R<sub>y</sub>(90&deg;)
-R<sub>x</sub>(90&deg;)** to an arm leaves its z-axis realigned with its *original* x-axis, so one
-whole axis of further rotation has silently vanished.
+Three stacked axis rotations -- **R = R<sub>z</sub>R<sub>y</sub>R<sub>x</sub>**, AutoRob's XYZ
+order -- are the most direct way to build a 3D rotation, and what `matrix_from_rpy` uses for every
+*fixed* `<origin rpy="...">`. But driving a joint's *variable* rotation this way has a failure
+mode: **gimbal lock**, where two axes rotate into alignment and 3 DOF collapse to 2.
 
-This is exactly why `traverseFKJoint` never stacks Euler-angle rotations for a joint's own motion --
-every joint gets a single axis-angle rotation, converted to a quaternion and then a matrix, which
-has no equivalent singularity. (Fixed `<origin rpy="...">` offsets are safe to leave as Euler
-angles precisely because they're author-time constants, never driven through a singularity at
-runtime.)
+Drive the **pitch** ring to &plusmn;90&deg;. The roll axis swings onto the yaw axis, the matrix
+turns red, and the two stop being independent. The lecture's "shoulder" version is this same
+event: **R<sub>z</sub>(90&deg;)R<sub>y</sub>(90&deg;)R<sub>x</sub>(90&deg;)** leaves an arm's
+z-axis on its *original* x-axis.
 
+This is why `traverseFKJoint` never stacks Euler angles for a joint's own motion -- each joint gets
+one axis-angle rotation via a quaternion, which has no such singularity.
+
+</div>
+</div>
+<div>
+<GimbalLockPanel />
+</div>
+</div>
 </div>
 
 ---
@@ -197,18 +328,16 @@ layout: default
 
 <div class="panel text-sm" style="font-size:0.78em">
 
-A real URDF (Unified Robot Description Format) file is XML. Every `<link>` can carry up to three
-independent descriptions of its physical extent: **`<visual>`** (what's rendered) and
-**`<collision>`** (what a planner checks against) each hold their own `<geometry>`, specifiable
-separately because a robot's visual mesh is usually far more detailed than collision-checking
-wants; **`<inertial>`** holds no geometry at all -- just `<mass>` and the `<inertia>` tensor,
-which a modeller typically *derives* from a geometry rather than storing one. Every `<joint>`
-names its parent/child link, a **fixed** `<origin>` offset, and (for a movable joint) a
-rotation/translation **`<axis>`**; `revolute` joints additionally require a **`<limit>`**.
+A real URDF file is XML. A `<link>` carries up to three independent descriptions of its physical
+extent: **`<visual>`** (rendered) and **`<collision>`** (what a planner checks) each hold their own
+`<geometry>` -- specifiable separately because a visual mesh is usually far finer than collision
+needs -- while **`<inertial>`** holds *no* geometry, only `<mass>` and the `<inertia>` tensor. A
+`<joint>` names its parent/child link, a fixed `<origin>`, and an `<axis>`; `revolute` also
+requires a `<limit>`.
 
 </div>
 
-```xml {lines:true}
+```xml {*}{lines:true,maxHeight:'300px'}
 <link name="torso">
   <visual>
     <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -254,10 +383,10 @@ future `motion_planning/` (RRT) module.
 
 ```xml
 <joint name="joint1" type="revolute">
-  <parent link="base_link"/>
+  <parent link="mast_link"/>
   <child link="arm_link1"/>
-  <origin xyz="0 0.25 0" rpy="0 0 0"/>
-  <axis xyz="0 1 0"/>
+  <origin xyz="0 0.3 0" rpy="0 0 0"/>
+  <axis xyz="0 0 1"/>
   <!-- required for revolute -->
   <limit lower="-3.14" upper="3.14"
          effort="100" velocity="10"/>
@@ -269,10 +398,10 @@ future `motion_planning/` (RRT) module.
 
 ```js
 joint1: {
-  parent: 'base_link', child: 'arm_link1',
+  parent: 'mast_link', child: 'arm_link1',
   type: 'revolute',
-  origin: { xyz: [0, 0.25, 0], rpy: [0, 0, 0] },
-  axis: [0, 1, 0], angle: 0
+  origin: { xyz: [0, 0.3, 0], rpy: [0, 0, 0] },
+  axis: [0, 0, 1], angle: 0
 }
 ```
 
@@ -334,6 +463,65 @@ The wheel on the right is Fetch's real `l_wheel_link.STL`. Fetch leans on exactl
 layout: default
 ---
 
+# Anatomy of an STL file
+
+<div class="panel text-sm">
+
+Fetch's `l_wheel_link.STL` is a **binary** STL, as most real robot STLs are -- there is no text to
+read. The whole file is a header, a triangle count, then one fixed 50-byte record per triangle.
+
+</div>
+
+<div class="split-panel" style="margin-top:0.4em">
+<div>
+
+<div class="panel" style="font-size:0.8em">
+
+| bytes | field |
+|---|---|
+| `0 .. 79` | header, ignored (all zero here) |
+| `80 .. 83` | `uint32` triangle count = **2086** |
+| `84 ..` | 2086 &times; the 50-byte record below |
+| | |
+| `+0 .. 11` | 3 &times; `float32` facet normal |
+| `+12 .. 23` | 3 &times; `float32` vertex 1 |
+| `+24 .. 35` | 3 &times; `float32` vertex 2 |
+| `+36 .. 47` | 3 &times; `float32` vertex 3 |
+| `+48 .. 49` | `uint16` attribute, unused |
+
+</div>
+</div>
+<div>
+
+<div class="panel" style="font-size:0.78em">
+
+**The real first triangle, decoded**
+
+```text
+normal  = ( +0.00000, +1.00000, +0.00000 )
+vertex1 = ( +0.00727, +0.04250, -0.00420 )
+vertex2 = ( +0.01535, +0.04250, -0.01433 )
+vertex3 = ( +0.00494, +0.04250, -0.00680 )
+```
+
+84 + 50&times;2086 = **104,384 bytes**, exactly the file size: nothing is optional, so triangle
+count alone fixes the size. All three vertices share `y = +0.0425` -- a flat face on the wheel.
+
+</div>
+</div>
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+STL's **ASCII** form carries identical data as `solid` / `facet normal` / `vertex` / `endfacet`
+keywords in roughly 6&times; the bytes. Loaders sniff the header to tell them apart.
+
+</div>
+
+---
+layout: default
+---
+
 # Geometry format: Collada (.dae)
 
 <div class="content-body">
@@ -360,6 +548,72 @@ could not do: it arrives **already textured**, because the file names its own im
 <MeshFormatExamplePanel format="collada" mesh-url="meshes/fetch_head_pan_link.dae" :color="0x27966b" />
 </div>
 <div class="side-caption">live three.js render via ColladaLoader &mdash; Fetch's <code>head_pan_link.dae</code>, <b>with its own texture</b>, which STL could not carry</div>
+</div>
+</div>
+</div>
+
+---
+layout: default
+---
+
+# Anatomy of a Collada file
+
+<div class="panel text-sm">
+
+Collada is XML, so it *is* readable -- the cost is that what STL spends 50 bytes on, Collada
+spells out in tags. These are the real sections of Fetch's `head_pan_link.dae`.
+
+</div>
+
+<div class="split-panel" style="margin-top:0.4em">
+<div>
+
+```xml {*}{maxHeight:'330px'}
+<COLLADA version="1.4.1">
+  <asset><up_axis>Z_UP</up_axis></asset>
+  <library_images/>        <!-- head_pan_uv.png -->
+  <library_effects/>       <!-- shading params -->
+  <library_materials/>
+  <library_geometries><mesh>
+    <source id="...-positions"/>
+    <source id="...-normals"/>
+    <source id="...-map-0"/> <!-- UVs -->
+    <vertices/>
+    <triangles material="...">
+      <input semantic="VERTEX"   offset="0"/>
+      <input semantic="NORMAL"   offset="1"/>
+      <input semantic="TEXCOORD" offset="2"/>
+      <p>... index stream ...</p>
+    </triangles>
+  </mesh></library_geometries>
+  <library_visual_scenes/> <!-- node tree -->
+</COLLADA>
+```
+
+</div>
+<div>
+
+<div class="panel" style="font-size:0.78em">
+
+```xml
+<float_array
+  id="head_pan_link-mesh-positions-array"
+  count="5532">
+0.1974999 -0.1282082 0.05799853
+0.1974999 -0.1083217 0.05799853 ...
+```
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+`count="5532"` counts **floats**, not points: 5532/3 = **1844 positions**, each stored once and
+then referenced by index from `<p>`. That indexing is what STL cannot express.
+
+The three `<input>` lines are the payoff -- one triangle corner carries a position **and** a normal
+**and** a UV, each from its own array. `<library_images>` is how this file knows about its texture
+and arrives already shaded.
+
 </div>
 </div>
 </div>
@@ -395,6 +649,64 @@ from outside the ROS ecosystem, rather than the one roboticists reach for first.
 <MeshFormatExamplePanel format="obj" mesh-url="meshes/spot_front_left_lower_leg.obj" :color="0x3b6ea5" />
 </div>
 <div class="side-caption">live three.js render via OBJLoader &mdash; Spot's <code>front_left_lower_leg.obj</code> (not Fetch or PR2: neither ships OBJ)</div>
+</div>
+</div>
+</div>
+
+---
+layout: default
+---
+
+# Anatomy of an OBJ file
+
+<div class="panel text-sm">
+
+OBJ is line-oriented plain text: one record per line, first token naming the type. Every line
+below is real, from Spot's `front_left_lower_leg.obj`.
+
+</div>
+
+<div class="split-panel" style="margin-top:0.4em">
+<div>
+
+<div class="panel" style="font-size:0.8em">
+
+| keyword | count | meaning |
+|---|---|---|
+| `mtllib` | 1 | companion material file |
+| `o` / `g` | 1 / 1 | object and group name |
+| `usemtl` | 1 | material for following faces |
+| `s` | 1 | smoothing group (`0` = off) |
+| `v` | 21858 | vertex position |
+| `vn` | 7521 | vertex normal |
+| `vt` | 3 | texture coordinate |
+| `f` | 7548 | face |
+
+</div>
+</div>
+<div>
+
+<div class="panel" style="font-size:0.78em">
+
+```text
+mtllib ../../spot.mtl
+usemtl BlackAbs
+s      0
+v      -0.034704 0.008309 -0.334707
+vn     -0.9859 0.1514 -0.0707
+vt     0.535156 0.148438
+f      1/1/1 2/2/1 3/2/1
+```
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+Each `f` corner is **`position/texcoord/normal`** -- three *1-based* indices into the lists above,
+the indirection that lets one `v` serve many faces. This file barely uses it: 21858 positions for
+7548 faces is near-zero sharing, because it came from CAD. The format permits sharing; the
+exporter decides.
+
 </div>
 </div>
 </div>
@@ -477,10 +789,9 @@ layout: default
 
 <div class="panel text-sm" style="margin-bottom:0.4em">
 
-Step through the traversal below: a **link** is entered, its matrix set from the parent's matrix,
-then each of its **child joints** is visited in turn -- each composing its own fixed origin and
-variable motion before recursing into *its* child link. Watch the pseudocode panel's active line
-and the schematic tree assemble itself link by link.
+A **link** is entered, its matrix set from the parent's; then each **child joint** composes its
+fixed origin and variable motion before recursing into *its* child link. The **call stack** on the
+left *is* the matrix stack -- the transforms live in the recursion, pushed and popped with it.
 
 </div>
 
@@ -586,10 +897,12 @@ layout: default
 
 <div class="panel text-sm">
 
-A single mobile-base link with a 2-joint **planar arm** mounted on top -- 3 links total, matching
-this lab's own brief. Both arm joints rotate about the same (world "up") axis, so the whole arm
-sweeps one horizontal plane as it moves; the base link's own world pose is free to translate/rotate
-in that same plane, independent of the arm.
+A mobile base carrying a pitching mast with a 2-joint **planar arm** on top. All three joints turn
+about the **lateral +z axis**, which is what makes the arm planar in a **vertical** plane -- it
+reaches up and out, rather than sweeping a horizontal turntable. `joint_pitch` tilts the mast, and
+with it that entire plane, nose-up/nose-down; `joint1`/`joint2` articulate the arm inside it. The
+base link's own world pose stays free to translate/rotate on the ground plane, independent of all
+three.
 
 </div>
 
@@ -603,10 +916,9 @@ layout: default
 
 <div class="panel text-sm" style="margin-bottom:0.4em">
 
-`urdf_example` (ported from the upstream kineval-stencil's own
-`robots/robot_urdf_example.js`) is this module's second test robot specifically *because* its tree
-**branches** -- `link1` has two child joints -- exercising `traverseFKLink`'s "for each child
-joint" loop more than once, which the single-chain `mobile_arm` never does.
+`urdf_example` (from the upstream stencil's own `robots/robot_urdf_example.js`) branches --
+`link1` has two child joints -- so `traverseFKLink`'s "for each child joint" loop runs more than
+once, and the call stack visibly pops back down to `link1` before descending the second branch.
 
 </div>
 
@@ -691,26 +1003,56 @@ layout: default
 
 # Test cases
 
-<div class="panel text-sm">
+<div class="panel text-sm" style="font-size:0.78em">
 
-Every test case is a plain hyperlink into <code>forward_kinematics.html</code>, same convention as
-every other module in this project -- click any URL below to open that test case in a new tab:
+Every case is a plain hyperlink, same convention as every other module here -- click any URL to
+open it in a new tab. The first group runs in this module's own
+<code>forward_kinematics.html</code>; the second runs the **full KinEval viewer**, which drives the
+same completed FK code over the upstream stencil's own robots.
 
 </div>
 
-<div class="panel test-case-table" style="font-size:0.74em">
+<div class="split-panel" style="margin-top:0.4em">
+<div>
+
+<div class="panel test-case-table" style="font-size:0.62em">
+
+**this module's reference page**
 
 | Test case | URL |
 |---|---|
 | `mobile_arm`, default pose | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm" target="_blank">?robot=mobile_arm</a> |
-| `mobile_arm`, posed via sliders | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&angles=0.785,-0.524" target="_blank">?robot=mobile_arm&angles=0.785,-0.524</a> |
+| `mobile_arm`, pitched mast + arm swept | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&angles=0.5,0.8,-1.1" target="_blank">?robot=mobile_arm&angles=0.5,0.8,-1.1</a> |
+| `mobile_arm`, base driven off the origin | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&base_x=-2&base_z=2&base_yaw=0.6" target="_blank">?robot=mobile_arm&base_x=-2&base_z=2&base_yaw=0.6</a> |
 | `urdf_example`, branching tree | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=urdf_example" target="_blank">?robot=urdf_example</a> |
-| Mobile base translated + yawed | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&base_x=1&base_z=-0.5&base_yaw=0.6" target="_blank">?robot=mobile_arm&base_x=1&base_z=-0.5&base_yaw=0.6</a> |
-| **New 1**: arm fully extended | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&angles=0,0" target="_blank">?robot=mobile_arm&angles=0,0</a> |
-| **New 2**: arm folded back on itself | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&angles=1.5708,3.1416" target="_blank">?robot=mobile_arm&angles=1.5708,3.1416</a> |
-| **New 3**: `urdf_example`'s two branches at extremes | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=urdf_example&angles=1.5708,-1.5708,1.5708" target="_blank">?robot=urdf_example&angles=1.5708,-1.5708,1.5708</a> |
-| **New 4**: slow step-through for projection | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=urdf_example&step_ms=1500" target="_blank">?robot=urdf_example&step_ms=1500</a> |
-| **New 5**: base far from world origin, arm swept | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=mobile_arm&base_x=-2&base_z=2&angles=-1.2,0.8" target="_blank">?robot=mobile_arm&base_x=-2&base_z=2&angles=-1.2,0.8</a> |
+| `urdf_example`, both branches at extremes | <a href="/kineval/forward_kinematics/reference/forward_kinematics.html?robot=urdf_example&angles=1.5708,-1.5708,1.5708" target="_blank">?robot=urdf_example&angles=1.5708,-1.5708,1.5708</a> |
+
+</div>
+</div>
+<div>
+
+<div class="panel test-case-table" style="font-size:0.62em">
+
+**full KinEval viewer** &mdash; `w/s a/d q/e` drive the base, `j/k/l/h` pick a joint, `u/i` turn it
+
+| Test case | URL |
+|---|---|
+| **crawler** &mdash; 25 links, eight 3-joint legs off one base | <a href="/kineval/kineval/?robot=crawler" target="_blank">?robot=crawler</a> |
+| **mr2** &mdash; upstream's partial humanoid stencil | <a href="/kineval/kineval/?robot=mr2" target="_blank">?robot=mr2</a> |
+| **fetch** &mdash; 21 links; the only one with *prismatic* joints | <a href="/kineval/kineval/?robot=fetch" target="_blank">?robot=fetch</a> |
+| **baxter** &mdash; 20 links, two 7-DOF arms | <a href="/kineval/kineval/?robot=baxter" target="_blank">?robot=baxter</a> |
+| **sawyer** &mdash; 10 links, a single 7-DOF arm | <a href="/kineval/kineval/?robot=sawyer" target="_blank">?robot=sawyer</a> |
+
+</div>
+</div>
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em; font-size:0.72em">
+
+`fetch`, `baxter` and `sawyer` are ported from the upstream stencil's own `robots/` descriptions
+with their **kinematics intact but their meshes left out** -- 20-35MB apiece -- so the viewer
+draws a skeleton synthesized from each link's own joint offsets. Forward kinematics reads origins,
+axes and angles, never meshes, so it is unaffected.
 
 </div>
 

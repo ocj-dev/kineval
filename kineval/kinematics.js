@@ -89,10 +89,26 @@ function matrix_from_origin(origin) {
 function traverseFKJoint(robot, jointName, parentXform) {
     var joint = robot.joints[jointName];
 
+    // the joint's fixed origin offset from its parent link
     var jointOrigin = matrix_multiply(parentXform, matrix_from_origin(joint.origin));
 
-    var q = quaternion_normalize(quaternion_from_axisangle(joint.axis, joint.angle));
-    var jointXform = matrix_multiply(jointOrigin, quaternion_to_rotation_matrix(q));
+    // then its own variable one-DOF motion. The ported upstream robots
+    // (fetch especially) really do use all four URDF joint types, so unlike
+    // a revolute-only viewer this has to branch: prismatic joints slide
+    // along their axis, fixed joints contribute no motion at all, and
+    // revolute/continuous rotate via a quaternion built from axis+angle.
+    var jointXform;
+    if (joint.type === 'prismatic') {
+        var unitAxis = vector_normalize(joint.axis);
+        jointXform = matrix_multiply(jointOrigin, generate_translation_matrix(
+            unitAxis[0] * joint.angle, unitAxis[1] * joint.angle, unitAxis[2] * joint.angle
+        ));
+    } else if (joint.type === 'fixed') {
+        jointXform = jointOrigin;
+    } else {
+        var q = quaternion_normalize(quaternion_from_axisangle(joint.axis, joint.angle));
+        jointXform = matrix_multiply(jointOrigin, quaternion_to_rotation_matrix(q));
+    }
 
     joint.xform = jointXform;
     traverseFKLink(robot, joint.child, jointXform);

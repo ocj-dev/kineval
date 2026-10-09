@@ -7,14 +7,14 @@
 
 export const MASTER_PSEUDOCODE: string[] = [
   /* 0 */ 'buildFKTransforms(robot):',
-  /* 1 */ '    traverseFKBase(robot)   -- robot.origin -> world transform of the base link',
+  /* 1 */ '    traverseFKBase(robot)   -- robot.origin -> world',
   /* 2 */ 'traverseFKLink(name, matrix):',
-  /* 3 */ '    link.matrix = matrix   -- this link\'s fully-composed world transform',
+  /* 3 */ '    link.matrix = matrix   -- fully composed',
   /* 4 */ '    for each child joint of this link:',
   /* 5 */ 'traverseFKJoint(jointName, parentMatrix):',
-  /* 6 */ '    jointOrigin = parentMatrix * matrix_from_origin(joint.origin)   -- fixed offset',
-  /* 7 */ '    jointMatrix = jointOrigin * quaternion_to_rotation_matrix(axisangle(joint.axis, joint.angle))',
-  /* 8 */ '    traverseFKLink(joint.child, jointMatrix)   -- recurse into the child link',
+  /* 6 */ '    jointOrigin = parentMatrix * matrix_from_origin(joint.origin)',
+  /* 7 */ '    jointMatrix = jointOrigin * quat_to_matrix(axisangle(axis, angle))',
+  /* 8 */ '    traverseFKLink(joint.child, jointMatrix)   -- recurse',
 ]
 
 export const LINE_BUILD = 0

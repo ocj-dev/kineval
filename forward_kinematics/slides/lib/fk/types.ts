@@ -31,6 +31,15 @@ export interface RobotDesc {
 
 export type FKAction = 'build' | 'base' | 'link-enter' | 'joint-origin' | 'joint-motion' | 'joint-recurse'
 
+// One frame of the traversal's own call stack: which traverseFK* call is
+// active, and the transform it is holding. Stacking these IS the matrix
+// stack -- it lives in the recursion, not in a separate data structure.
+export interface FKFrame {
+  kind: 'base' | 'link' | 'joint'
+  name: string
+  matrix: Mat4
+}
+
 export interface FKStep {
   line: number
   action: FKAction
@@ -38,4 +47,5 @@ export interface FKStep {
   jointName?: string
   depth: number // matrix-stack depth at this step, for the push/pop visualization
   matrix?: Mat4 // the transform just computed, when action produces one
+  stack: FKFrame[] // the live call stack at this step, outermost first
 }

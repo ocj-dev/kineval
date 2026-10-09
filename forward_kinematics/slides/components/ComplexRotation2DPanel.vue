@@ -87,7 +87,10 @@ function onPointerMove(e: PointerEvent) {
 <template>
   <div class="complex-panel">
     <div class="controls">
-      <label>θ <input v-model.number="theta.value" type="range" min="-3.14159" max="3.14159" step="0.01"> {{ theta.value.toFixed(2) }} rad</label>
+      <label>&theta; <input v-model.number="theta.value" type="range" min="-3.14159" max="3.14159" step="0.01"> {{ theta.value.toFixed(2) }} rad</label>
+      <span class="group-label">point <b>p</b></span>
+      <label>x <input v-model.number="point.x" type="range" min="-2" max="2" step="0.01"></label>
+      <label>y <input v-model.number="point.y" type="range" min="-2" max="2" step="0.01"></label>
     </div>
     <div class="vector-canvas-wrap">
       <canvas ref="canvasEl" @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointermove="onPointerMove" @pointerleave="onPointerUp" />
@@ -97,6 +100,7 @@ function onPointerMove(e: PointerEvent) {
 
 <style scoped>
 .complex-panel { display: flex; flex-direction: column; height: 100%; gap: 0.5em; }
-.controls { display: flex; gap: 1em; font-size: 0.8em; font-family: var(--font-mono, monospace); }
-.controls input[type="range"] { width: 12em; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9em; font-size: 0.75em; font-family: var(--font-mono, monospace); }
+.controls input[type="range"] { width: 7em; }
+.group-label { font-weight: 700; color: var(--indigo, #202B4E); }
 </style>

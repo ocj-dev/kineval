@@ -19,11 +19,13 @@
     hasn't built yet (see ../README.md's build-order table; this page will
     grow those controls back in as those modules land).
 
-    Not included: baxter/fetch/sawyer, upstream's three real-world robots --
-    each ships 20-35MB of STL/Collada meshes, impractical to vendor into
-    this teaching repo. ?robot=urdf_example|mr2|crawler selects among the
-    three procedural-geometry test robots upstream's own robots/ directory
-    ships alongside those three.
+    ?robot= selects among six ported upstream robots:
+    urdf_example | mr2 | crawler carry their own procedural geometry, while
+    fetch | baxter | sawyer are ported with their kinematics intact but
+    WITHOUT their meshes (20-35MB apiece, impractical to vendor into this
+    teaching repo) -- scene.js synthesizes a skeleton from each link's joint
+    offsets instead. Forward kinematics reads origins, axes and angles,
+    never meshes, so it is unaffected.
 
     @author ohseejay / https://github.com/ohseejay
                      / https://bitbucket.org/ohseejay
@@ -80,19 +82,25 @@
 <script src="robots/robot_urdf_example.js"></script>
 <script src="robots/robot_mr2.js"></script>
 <script src="robots/robot_crawler.js"></script>
+<script src="robots/robot_fetch.js"></script>
+<script src="robots/robot_baxter.js"></script>
+<script src="robots/robot_sawyer.js"></script>
 
 <!-- ported upstream control/interaction layer -->
 <script src="controls.js"></script>
 <script src="userinput.js"></script>
 
 <script type="module">
-import { createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, resizeViewer } from './scene.js';
+import { createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, resizeViewer, frameCameraToRobot } from './scene.js';
 import * as THREE from './vendor/three/three.module.js';
 
 var ROBOT_FACTORIES = {
     urdf_example: createRobotUrdfExample,
     mr2: createRobotMr2,
-    crawler: createRobotCrawler
+    crawler: createRobotCrawler,
+    fetch: createRobotFetch,
+    baxter: createRobotBaxter,
+    sawyer: createRobotSawyer
 };
 
 var q = new URLSearchParams(window.location.search);
@@ -118,6 +126,7 @@ function loadRobot(name) {
     app.rig = buildRobotMeshes(viewer, app.robot, app.links_geom);
     robotForwardKinematics(app.robot);
     updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
+    frameCameraToRobot(viewer, app.robot);
 
     initKeyEvents(app.robot, app.params);
 }

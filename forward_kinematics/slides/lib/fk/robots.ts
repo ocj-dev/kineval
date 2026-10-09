@@ -14,12 +14,16 @@ export function createMobileArmRobot(): RobotDesc {
     base: 'base_link',
     links: {
       base_link: { geometry: { type: 'box', size: [0.6, 0.2, 0.6], offset: { xyz: [0, 0, 0], rpy: [0, 0, 0] } }, color: 0x3b6ea5 },
+      mast_link: { geometry: { type: 'box', size: [0.12, 0.3, 0.12], offset: { xyz: [0, 0.15, 0], rpy: [0, 0, 0] } }, color: 0x27966b },
       arm_link1: { geometry: { type: 'box', size: [0.5, 0.08, 0.08], offset: { xyz: [0.25, 0, 0], rpy: [0, 0, 0] } }, color: 0xd98236 },
       arm_link2: { geometry: { type: 'box', size: [0.4, 0.06, 0.06], offset: { xyz: [0.2, 0, 0], rpy: [0, 0, 0] } }, color: 0xc0392b },
     },
+    // all three joints turn about the lateral +z axis -- the arm is planar in
+    // a VERTICAL plane, and joint_pitch tilts that whole plane
     joints: {
-      joint1: { parent: 'base_link', child: 'arm_link1', type: 'revolute', origin: { xyz: [0, 0.25, 0], rpy: [0, 0, 0] }, axis: [0, 1, 0], angle: 0 },
-      joint2: { parent: 'arm_link1', child: 'arm_link2', type: 'revolute', origin: { xyz: [0.5, 0, 0], rpy: [0, 0, 0] }, axis: [0, 1, 0], angle: 0 },
+      joint_pitch: { parent: 'base_link', child: 'mast_link', type: 'revolute', origin: { xyz: [0, 0.1, 0], rpy: [0, 0, 0] }, axis: [0, 0, 1], angle: 0 },
+      joint1: { parent: 'mast_link', child: 'arm_link1', type: 'revolute', origin: { xyz: [0, 0.3, 0], rpy: [0, 0, 0] }, axis: [0, 0, 1], angle: 0 },
+      joint2: { parent: 'arm_link1', child: 'arm_link2', type: 'revolute', origin: { xyz: [0.5, 0, 0], rpy: [0, 0, 0] }, axis: [0, 0, 1], angle: 0 },
     },
     endeffector: { frame: 'joint2', position: [[0.4], [0], [0], [1]] },
   }

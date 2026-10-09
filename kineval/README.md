@@ -18,20 +18,27 @@ upstream's own scheme) will be added back in as each of those modules lands.
 
 ## Test robots
 
-Three of the upstream stencil's own `robots/` examples are ported in `robots/` here — select
+Six of the upstream stencil's own `robots/` examples are ported in `robots/` here — select
 between them with `?robot=`:
 
 | `?robot=` | Upstream source | Notes |
 |---|---|---|
-| `urdf_example` (default `forward_kinematics/`'s own test case) | `robots/robot_urdf_example.js` | simple branching 4-link arm |
+| `urdf_example` | `robots/robot_urdf_example.js` | simple branching 4-link arm |
 | `mr2` | `robots/robot_mr2.js` | upstream's own partial (right-arm-only) humanoid stencil exercise |
 | `crawler` **(default here)** | `robots/robot_crawler.js` | 8-legged crawler — the widest-branching test case |
+| `fetch` | `robots/fetch/fetch.urdf.js` | 21 links; the only one with **prismatic** joints |
+| `baxter` | `robots/baxter/baxter.urdf.js` | 20 links, two 7-DOF arms |
+| `sawyer` | `robots/sawyer/sawyer.urdf.js` | 10 links, a single 7-DOF arm |
 
-**Not included: `baxter`, `fetch`, `sawyer`** — upstream's three real-world robots, each shipping
-20–35MB of STL/Collada meshes. Impractical to vendor into this teaching repo; all three use the
-exact same `<visual>`/mesh-loading machinery the `forward_kinematics/` deck's geometry-format
-slides already cover with small hand-authored samples, so nothing conceptual is lost by leaving
-them out here.
+`fetch`, `baxter` and `sawyer` are ported with their **kinematics intact but their meshes left
+out** — 20–35MB apiece, impractical to vendor into this teaching repo. `scene.js` synthesizes a
+skeleton for them from each link's own joint offsets, so the proportions are the robot's real link
+lengths. Forward kinematics reads origins, axes and angles and never meshes, so it is unaffected.
+
+One upstream data defect is corrected in the port: `baxter.urdf.js` declares two fixed joints,
+`headnod` and `display_joint`, **both** joining `head` → `screen`, which makes the description a
+DAG rather than a tree and leaves a depth-first traversal visiting `screen` twice. The port keeps
+`headnod` (declared first) and drops `display_joint`.
 
 ## Path planning reference, already live
 
