@@ -565,9 +565,12 @@ layout: default
 
 <div class="panel text-sm" style="margin-bottom:0.4em">
 
-The same idea, one dimension up: a unit quaternion built from an axis and an angle rotates a 3D
-point by conjugation, **v&prime; = q v q<sup>-1</sup>**. Drag the axis and angle and watch the
-point (gray) rotate to its image (amber) around the dashed axis line.
+One dimension up: a unit quaternion built from an axis and an angle rotates a 3D point by
+conjugation, **v&prime; = q v q<sup>-1</sup>**. Drag the axis, the angle, or **v** itself. The amber
+ring is where **v** lands for *every* &theta; -- the circle it traces about the axis. Tilt the axis
+onto **v** and the ring shrinks to nothing: a vector along the rotation axis is what the rotation
+leaves fixed. **Orbit view** turns the camera, since any fixed 2D view of a 3D circle can catch it
+edge-on.
 
 </div>
 

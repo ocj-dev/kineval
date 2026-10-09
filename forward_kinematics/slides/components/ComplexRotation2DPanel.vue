@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { reactive, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { rotatePoint2D } from '../lib/fk/complexMath'
 import { clearCanvas, INDIGO, AMBER } from '../lib/fk/drawUtils'
 
@@ -18,6 +18,9 @@ function redraw() {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const rect = canvas.getBoundingClientRect()
+  // see QuaternionRotation3DPanel.vue: never commit a 0x0 backing store, or
+  // the browser stretches an uninitialized bitmap over the whole element
+  if (rect.width === 0 || rect.height === 0) return
   canvas.width = rect.width; canvas.height = rect.height
   clearCanvas(ctx, canvas.width, canvas.height)
 
@@ -56,7 +59,18 @@ function redraw() {
 }
 
 watch([() => theta.value, () => point.x, () => point.y], redraw)
-onMounted(redraw)
+
+// Drives both the first paint and every resize -- onMounted alone fires
+// before this element has been laid out, leaving the canvas at 0x0 until
+// some unrelated reactive change happened to repaint it.
+let resizeObserver: ResizeObserver | null = null
+onMounted(() => {
+  if (!canvasEl.value) return
+  resizeObserver = new ResizeObserver(() => redraw())
+  resizeObserver.observe(canvasEl.value)
+  redraw()
+})
+onBeforeUnmount(() => resizeObserver?.disconnect())
 
 let dragging = false
 function onPointerDown() { dragging = true }
