@@ -254,13 +254,13 @@ the same idea.
 <div>
 
 <div class="side-image">
-<img src="/images/hamilton_quaternion_plaque.jpg" alt="Stone plaque on Broom Bridge, Dublin, reading: Here as he walked by on the 16th of October 1843 Sir William Rowan Hamilton in a flash of genius discovered the fundamental formula for quaternion multiplication i squared equals j squared equals k squared equals ijk equals minus one and cut it on a stone of this bridge" />
+<img src="/images/broom_bridge_quaternion_plaque.jpg" alt="Stone plaque on Broom Bridge, Dublin, reading: Here as he walked by on the 16th of October 1843 Sir William Rowan Hamilton in a flash of genius discovered the fundamental formula for quaternion multiplication i squared equals j squared equals k squared equals ijk equals minus one and cut it on a stone of this bridge" />
 </div>
 <div class="side-caption">
 The plaque on Broom (Brougham) Bridge, Dublin &mdash; <i>"&hellip;discovered the fundamental formula
 for quaternion multiplication i&sup2; = j&sup2; = k&sup2; = ijk = &minus;1 &amp; cut it on a stone
 of this bridge."</i><br>
-Photo: Dwmalone, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, via Wikimedia Commons
+Photo: Cone83, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>, via Wikimedia Commons
 </div>
 </div>
 </div>
