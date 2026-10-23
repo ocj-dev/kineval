@@ -51,32 +51,6 @@ module's buildFKTransforms.
 layout: default
 ---
 
-# Forward kinematics, briefly
-
-<div class="panel text-sm">
-
-A quick recap before inverting anything: forward kinematics takes joint angles in and produces a
-single, unique endeffector pose out, via one depth-first pass over the kinematic tree, composing
-each joint's local transform onto its parent's as it goes (`buildFKTransforms`, this project's
-forward-kinematics module). No iteration, no ambiguity -- one set of joint angles, one pose, every
-time.
-
-</div>
-
-<div class="panel text-sm" style="margin-top:0.4em">
-
-This deck assumes that machinery already exists and is correct -- every `joint.matrix`/`link.matrix`
-read anywhere in this module (`computeManipulatorJacobian`'s `z_i`/`p_i`, `iterateIK`'s `p_ee`) was
-put there by that same DFS pass. For the full derivation -- the matrix stack, quaternion composition,
-the traversal itself -- see the forward-kinematics deck:
-<a href="https://ocj-dev.github.io/kineval/forward_kinematics/" target="_blank">ocj-dev.github.io/kineval/forward_kinematics/</a>.
-
-</div>
-
----
-layout: default
----
-
 # The inverse kinematics problem
 
 <div class="panel text-sm" style="padding:0.55em 0.9em">
@@ -99,8 +73,9 @@ one of forward kinematics' closed-form guarantees:
 - **Optimization** -- minimize endeffector error by Jacobian-based iteration; what the rest of this
   deck builds
 - **Closed-form / algebraic** -- hand-derived per-robot geometric solutions; fast and exact, but not general
-- **CCD (cyclic coordinate descent)** -- no Jacobian, adjusts one joint at a time from the endeffector
-  back toward the base; this deck's own dedicated slide (just ahead) walks through it
+- **CCD (cyclic coordinate descent)** -- no Jacobian: working from the endeffector back toward the
+  base, adjust one joint at a time so the endeffector lies as close as possible to the target, then
+  move to the next joint inward, repeating the whole sweep until convergence
 - **FABRIK** (Forward And Backward Reaching Inverse Kinematics) -- a point-based iterative heuristic,
   also no Jacobian (**Aristidou &amp; Lasenby, 2011**, <i>Graphical Models</i>, vol. 73, no. 5, pp.
   243&ndash;260 -- verified against the published record, same discipline this deck's Whitney-1969
@@ -140,51 +115,6 @@ verified citation rather than repeating an unverified one from the source materi
 layout: default
 ---
 
-# A non-Jacobian alternative: Cyclic Coordinate Descent
-
-<div class="panel text-sm" style="padding:0.55em 0.9em">
-
-The lecture poses CCD as "maybe there is a simpler approach to IK?", citing **&#91;Wang, Chen 1991&#93;**.
-Instead of a Jacobian, CCD adjusts **one joint at a time**, working from the endeffector back toward
-the base: rotate the current joint so the endeffector lies as close as possible to the target, then
-move to the next joint inward, and repeat the whole sweep until convergence.
-
-</div>
-
-<div class="split-panel" style="margin-top:0.3em; height:auto; flex:0 0 auto">
-<div>
-
-<div class="panel" style="padding:0.55em 0.9em">
-
-**Cyclic Coordinate Descent**
-- &#43; fast to compute, simple to implement
-- &minus; smoothness over time not considered
-
-</div>
-</div>
-<div>
-
-<div class="panel" style="padding:0.55em 0.9em">
-
-**Jacobian-based methods (this deck)**
-- &#43; general transform of velocities/wrenches between frames
-- &minus; slower, subject to numerical issues and local minima
-
-</div>
-</div>
-</div>
-
-<div class="panel text-sm" style="margin-top:0.3em; padding:0.55em 0.9em">
-
-CCD never builds anything like `robot.jacobian` -- it's a genuinely different algorithm family, kept
-here as the contrast that makes the rest of this deck's choice (a Jacobian) legible as a choice.
-
-</div>
-
----
-layout: default
----
-
 # The overall algorithmic process
 
 <div class="panel text-sm" style="margin-bottom:0.4em">
@@ -205,18 +135,6 @@ layout: default
 ---
 
 # Interactive: drag a target, watch it converge
-
-<div class="panel text-sm" style="margin-bottom:0.4em">
-
-Before building each piece -- the Jacobian, the error term, the solve methods -- watch the whole loop
-run end to end. Drag the magenta sphere anywhere in 3D; the arm converges toward it **live**, solved by
-`runIkIteration` -- the same TS port of `iterateIK` this deck's later step-through panel calls, not a
-separately-tuned approximation for the picture. Switch methods and watch the qualitative difference
-this deck's upcoming derivations will explain: `transpose` is cheap but can wander or oscillate near
-convergence; `pseudoinverse` is the least-squares-optimal direction but can swing wildly approaching a
-near-singular pose; `damped` trades a little accuracy there for staying bounded.
-
-</div>
 
 <div class="content-body">
 <IkConvergePanel robot-name="mr2" />
@@ -310,14 +228,16 @@ layout: default
 
 <div class="panel text-sm" style="margin-bottom:0.4em">
 
-Minimizing **f(x) = cos(3&pi;x) / x** on **0 &lt; x &le; 2** (x = 0 is undefined, so the domain stays
-strictly positive) by the exact update from the previous slide: **x<sub>n+1</sub> = x<sub>n</sub>
-&minus; &gamma;f&prime;(x<sub>n</sub>)**, with **f&prime;(x) = (&minus;3&pi;x&middot;sin(3&pi;x)
-&minus; cos(3&pi;x)) / x&sup2;** by the quotient rule (verified against a central finite-difference
-check before shipping this panel). The oscillating `cos(3&pi;x)` term gives this function multiple
-local minima and maxima on `(0, 2]` -- drag the starting `x` across the domain and watch gradient
-descent land in *different* valleys, or fail to settle at all near the steep region close to zero.
-That's a real limitation, and the Jacobian-based IK the rest of this deck builds inherits it too:
+Minimizing an asymmetric double-well **f(x) = (x&sup2; &minus; 1)&sup2; + c&middot;x** on
+**&minus;2 &le; x &le; 2** (here **c = 0.5**, just enough to break the symmetry) by the exact update
+from the previous slide: **x<sub>n+1</sub> = x<sub>n</sub> &minus; &gamma;f&prime;(x<sub>n</sub>)**,
+with **f&prime;(x) = 4x&sup3; &minus; 4x + c** (verified against a central finite-difference check
+before shipping this panel). Exactly three critical points over the domain -- a deeper **global**
+minimum near **x &asymp; -1.06**, a local maximum near **x &asymp; 0.13**, and a shallower **local**
+minimum near **x &asymp; 0.93** -- drag the start-`x` slider across the domain and watch gradient
+descent fall into one well or the other, **deterministically**, based purely on which side of the
+local max it starts on. That's a cleaner illustration of start-point-dependence than an oscillating
+function gives, and the Jacobian-based IK the rest of this deck builds inherits the same idea:
 multiple solutions, local minima, and an outcome that depends on where you start.
 
 </div>
@@ -364,70 +284,18 @@ layout: default
 Every chain joint's per-column math, all at once, instantiated with `urdf_example`'s actual numbers at
 its current pose -- the same **z<sub>i</sub> = R<sub>i</sub> &middot; axis<sub>i</sub>**, **p<sub>i</sub>
 = translation(R<sub>i</sub>)**, lever arm **= p<sub>ee</sub> &minus; p<sub>i</sub>**, and column
-**J<sub>vi</sub> = z<sub>i</sub> &times; (p<sub>ee</sub> &minus; p<sub>i</sub>)** the next few slides
-derive, and the following `computeManipulatorJacobian` build-through panel steps through one joint at
-a time. Pick a joint from the dropdown to highlight its axis arrow and lever-arm vector at full
-saturation against the rest of the chain, rendered at 60% opacity.
+**J<sub>vi</sub> = z<sub>i</sub> &times; (p<sub>ee</sub> &minus; p<sub>i</sub>)** the next slide's
+`computeManipulatorJacobian` code builds, and the following build-through panel steps through one
+joint at a time. Pick a joint from the dropdown, then click any one of its three expression lines
+below (axis **z<sub>i</sub>**, lever arm, or Jacobian column **J<sub>vi</sub>**) to isolate *just that
+vector* at full saturation in the 3D view -- the other two dim out -- against the rest of the chain,
+rendered at 60% opacity. The column itself is drawn from the end-effector, since it's the resulting
+velocity direction.
 
 </div>
 
 <div class="content-body">
 <JacobianExpressionPanel robot-name="urdf_example" />
-</div>
-
----
-layout: default
----
-
-# The geometric Jacobian: structure
-
-<div class="panel text-sm">
-
-A 6&times;N matrix (3 linear rows over 3 angular rows, N joint columns) stacks two 3&times;N blocks:
-
-</div>
-
-<div class="split-panel" style="margin-top:0.4em; height:auto; flex:0 0 auto">
-<div>
-
-<div class="panel">
-
-**Column *i*, revolute joint**
-- linear: **z<sub>i</sub> &times; (o<sub>n</sub> &minus; o<sub>i</sub>)**
-- angular: **z<sub>i</sub>**
-
-</div>
-</div>
-<div>
-
-<div class="panel">
-
-**Column *i*, prismatic joint**
-- linear: **z<sub>i</sub>**
-- angular: **0**
-
-</div>
-</div>
-</div>
-
-<div class="panel text-sm" style="margin-top:0.4em">
-
-**o<sub>n</sub>** is the endeffector's world position, **o<sub>i</sub>** joint *i*'s world origin, **z<sub>i</sub>**
-its world rotation axis -- every quantity expressed in the *world* frame (the lecture's own
-"Important" box, p. 65). This module's reference implementation only ever builds revolute chains, so
-`computeManipulatorJacobian` implements the left column only -- the next slide is that function.
-
-</div>
-
-<div class="history-note">
-<b>A one-line clarifying note on z<sub>i</sub></b>
-The lecture computes <b>z<sub>i</sub></b> as <b>{k<sub>i</sub>}<sup>w</sup> &minus; {o<sub>i</sub>}<sup>w</sup></b> --
-a point one unit along the joint's local axis, transformed by the joint's full homogeneous world
-matrix, minus the joint's own world origin. That subtraction is what makes the result a pure
-<em>direction</em>: the translation part of the homogeneous transform affects both terms identically
-and cancels, leaving just the rotated axis. Correct, but easy to misread as doing something fancier
-than "rotate the axis by the joint's world rotation block" -- which is exactly what
-`computeManipulatorJacobian`'s own `z_i` computation does directly, without building the extra point.
 </div>
 
 ---
@@ -690,7 +558,7 @@ layout: default
 
 # Test cases
 
-<div class="panel text-sm" style="font-size:0.78em">
+<div class="panel text-sm" style="font-size:0.72em; padding:0.4em 0.7em">
 
 Every case is a plain hyperlink, same convention as this project's other modules -- click any URL to
 open it in a new tab, running this module's own `inverse_kinematics.html` (see
@@ -698,10 +566,10 @@ open it in a new tab, running this module's own `inverse_kinematics.html` (see
 
 </div>
 
-<div class="split-panel" style="margin-top:0.4em; height:auto; flex:0 0 auto">
+<div class="split-panel" style="margin-top:0.3em; height:auto; flex:0 0 auto">
 <div>
 
-<div class="panel test-case-table" style="font-size:0.6em">
+<div class="panel test-case-table" style="font-size:0.55em; padding:0.3em 0.5em">
 
 **convergence, different methods**
 
@@ -717,7 +585,7 @@ open it in a new tab, running this module's own `inverse_kinematics.html` (see
 </div>
 <div>
 
-<div class="panel test-case-table" style="font-size:0.6em">
+<div class="panel test-case-table" style="font-size:0.55em; padding:0.3em 0.5em">
 
 **underactuated: `urdf_example` can't fully converge**
 
@@ -730,19 +598,14 @@ open it in a new tab, running this module's own `inverse_kinematics.html` (see
 </div>
 </div>
 
-<div class="panel text-sm" style="margin-top:0.4em; font-size:0.72em">
+<div class="panel text-sm" style="margin-top:0.3em; padding:0.35em 0.7em; font-size:0.62em">
 
-`urdf_example`'s chain (`joint2`, `joint3`) is only **2 revolute joints** against a full 3D position
-target -- 2 DOF chasing 3 task dimensions. Smoke-testing the reference implementation confirmed what
-the math predicts: `|dx|` settles to a small but **persistent nonzero residual** rather than reaching
-zero, because no joint configuration reaches every point in R<sup>3</sup> from a 2-DOF chain. This is
-the opposite failure mode from a singularity (too few independent directions available at all,
-everywhere, not just at one configuration) -- both are visible, honest limits of the method, not bugs.
-
-`fetch` is this deck's one chain with a **prismatic** joint (`torso_lift_joint`) ahead of eight
-revolute ones -- its Jacobian column is just that joint's world axis directly, no cross product
-(a prismatic joint's motion already *is* a translation), exercising the branch
-`computeManipulatorJacobian` added alongside the all-revolute chains above.
+`urdf_example`'s 2-joint chain chases a 3D target -- 2 DOF vs. 3 task dimensions, so `|dx|` settles to
+a small **persistent nonzero residual** instead of zero (no 2-DOF configuration reaches every point in
+R<sup>3</sup>) -- the opposite failure mode from a singularity, both honest limits of the method, not
+bugs. `fetch` is this deck's one chain with a **prismatic** joint (`torso_lift_joint`) ahead of eight
+revolute ones -- its Jacobian column is just that joint's world axis directly, no cross product,
+exercising the branch `computeManipulatorJacobian` added alongside the all-revolute chains above.
 
 </div>
 

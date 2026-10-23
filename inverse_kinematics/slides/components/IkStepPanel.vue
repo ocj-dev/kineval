@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import PseudocodePanel from './PseudocodePanel.vue'
 import { useStepTracer } from '../lib/ik/useStepTracer'
-import { iterateIkSteps } from '../lib/ik/solveSteps'
+import { iterateIkSteps, runIkIteration, applyControls } from '../lib/ik/solveSteps'
 import { buildFK, endEffectorWorldPosition } from '../lib/ik/fkForIk'
 import { ROBOT_FACTORIES, CHAIN_JOINT_NAMES, INITIAL_ANGLES, DEFAULT_TARGETS, type RobotName } from '../lib/ik/robots'
 import { MASTER_IK_LOOP } from '../lib/ik/pseudocode'
@@ -18,6 +18,18 @@ import type { IkMethod, IkParams, IterateIkStep, Mat4, RobotDesc } from '../lib/
 // (reference/inverse_kinematics.js#iterate-inverse-kinematics), via the
 // iterateIkSteps generator (solveSteps.ts), which performs the identical
 // sequence of matrix.js operations.
+//
+// "Run to convergence" (below) is a SEPARATE loop from the single-call
+// step-through above: it repeatedly calls the full iterateIK-equivalent
+// pipeline (runIkIteration + applyControls + buildFK -- same three-stage
+// pipeline IkConvergePanel.vue's own animation loop runs, the exact
+// TS port, not a re-derived approximation) once per animation frame, until
+// |dx| drops under a convergence tolerance OR a max-iteration safety cap
+// is hit. This deck's own "Test cases" slide already documents that
+// urdf_example's 2-joint chain against a 3D target settles to a
+// persistent nonzero residual rather than reaching zero -- so this control
+// terminates honestly on the cap and reports which way it stopped, rather
+// than silently pretending every run converges.
 
 const props = withDefaults(defineProps<{ robotName?: RobotName }>(), { robotName: 'urdf_example' })
 const robotName = props.robotName
@@ -31,13 +43,89 @@ const target = DEFAULT_TARGETS[robotName]
 const speedMs = ref(900)
 const tracer = useStepTracer<IterateIkStep>(speedMs)
 
-function retrace() {
-  const ikParams: IkParams = { method: method.value, steplength: 0.3, damping: 0.15, orientationIncluded: false, chainJointNames: CHAIN_JOINT_NAMES[robotName] }
-  tracer.load([...iterateIkSteps(robot, target, null, ikParams, true)])
+function currentIkParams(): IkParams {
+  return { method: method.value, steplength: 0.3, damping: 0.15, orientationIncluded: false, chainJointNames: CHAIN_JOINT_NAMES[robotName] }
 }
-watch(method, retrace)
+
+function retrace() {
+  tracer.load([...iterateIkSteps(robot, target, null, currentIkParams(), true)])
+}
+watch(method, () => { stopConvergenceRun(); retrace() })
 
 const fmt = (v: number) => (v >= 0 ? ' ' : '') + v.toFixed(3)
+
+/* ---------------- "Run to convergence": loop full iterateIK calls ---------------- */
+const CONVERGE_TOL = 0.01 // same |dx| threshold IkConvergePanel.vue's own "converged" tag uses
+const MAX_CONVERGE_ITERS = 500 // honest safety cap -- urdf_example's 2-joint chain vs. a 3D target never reaches CONVERGE_TOL
+
+const isConverging = ref(false)
+const convergeIterCount = ref(0)
+const convergeDxNorm = ref(0)
+const convergeOutcome = ref<string | null>(null)
+let convergeRaf = 0
+
+function resetRobotPose() {
+  for (const n in INITIAL_ANGLES[robotName]) robot.joints[n].angle = INITIAL_ANGLES[robotName][n]
+  for (const n in robot.joints) robot.joints[n].control = 0
+  buildFK(robot)
+}
+
+function stopConvergenceRun() {
+  if (convergeRaf) cancelAnimationFrame(convergeRaf)
+  convergeRaf = 0
+  isConverging.value = false
+}
+
+function runToConvergence() {
+  if (isConverging.value) return
+  tracer.pause()
+  stopConvergenceRun()
+  resetRobotPose()
+  syncScene()
+  isConverging.value = true
+  convergeIterCount.value = 0
+  convergeDxNorm.value = Infinity
+  convergeOutcome.value = null
+  const ikParams = currentIkParams()
+
+  const step = () => {
+    const result = runIkIteration(robot, target, null, ikParams)
+    applyControls(robot)
+    buildFK(robot)
+    let sumSq = 0
+    for (const row of result.dx) sumSq += row[0] * row[0]
+    const dxNorm = Math.sqrt(sumSq)
+    convergeIterCount.value++
+    convergeDxNorm.value = dxNorm
+    syncScene()
+
+    if (dxNorm < CONVERGE_TOL) {
+      convergeOutcome.value = `converged in ${convergeIterCount.value} iterations (|dx| = ${dxNorm.toFixed(4)})`
+      isConverging.value = false
+      convergeRaf = 0
+      return
+    }
+    if (convergeIterCount.value >= MAX_CONVERGE_ITERS) {
+      convergeOutcome.value = `stopped after ${convergeIterCount.value} iterations -- residual still |dx| = ${dxNorm.toFixed(4)}`
+      isConverging.value = false
+      convergeRaf = 0
+      return
+    }
+    convergeRaf = requestAnimationFrame(step)
+  }
+  convergeRaf = requestAnimationFrame(step)
+}
+
+function doReset() {
+  stopConvergenceRun()
+  convergeOutcome.value = null
+  convergeIterCount.value = 0
+  convergeDxNorm.value = 0
+  resetRobotPose()
+  tracer.reset()
+  retrace()
+  syncScene()
+}
 
 /* ---------------- small 3D context view ---------------- */
 const viewport = ref<HTMLDivElement | null>(null)
@@ -124,7 +212,7 @@ onMounted(() => {
   retrace()
   syncScene()
 })
-onBeforeUnmount(() => { cancelAnimationFrame(raf); ro?.disconnect(); renderer?.dispose() })
+onBeforeUnmount(() => { cancelAnimationFrame(raf); stopConvergenceRun(); ro?.disconnect(); renderer?.dispose() })
 </script>
 
 <template>
@@ -135,17 +223,22 @@ onBeforeUnmount(() => { cancelAnimationFrame(raf); ro?.disconnect(); renderer?.d
       </div>
       <div class="controls">
         <label>method
-          <select v-model="method">
+          <select v-model="method" :disabled="isConverging">
             <option value="transpose">transpose</option>
             <option value="pseudoinverse">pseudoinverse</option>
             <option value="damped">damped</option>
           </select>
         </label>
-        <button class="btn" :disabled="tracer.isAtStart.value" @click="tracer.stepBack">&laquo; Step</button>
-        <button v-if="!tracer.isRunning.value" class="btn primary" :disabled="tracer.isDone.value" @click="tracer.play">&#9654; Play</button>
+        <button class="btn" :disabled="tracer.isAtStart.value || isConverging" @click="tracer.stepBack">&laquo; Step</button>
+        <button v-if="!tracer.isRunning.value" class="btn primary" :disabled="tracer.isDone.value || isConverging" @click="tracer.play">&#9654; Play</button>
         <button v-else class="btn primary" @click="tracer.pause">&#10074;&#10074; Pause</button>
-        <button class="btn" :disabled="tracer.isDone.value" @click="tracer.stepForward">Step &raquo;</button>
-        <button class="btn" @click="tracer.reset">&#8634; Reset</button>
+        <button class="btn" :disabled="tracer.isDone.value || isConverging" @click="tracer.stepForward">Step &raquo;</button>
+        <button class="btn" :disabled="isConverging" @click="doReset">&#8634; Reset</button>
+      </div>
+      <div class="controls converge-row">
+        <button class="btn primary" :disabled="isConverging" @click="runToConvergence">&#9654;&#9654; Run to convergence</button>
+        <span v-if="isConverging" class="status-tag running">iter {{ convergeIterCount }} &middot; |dx| = {{ convergeDxNorm.toFixed(4) }} &middot; running&hellip;</span>
+        <span v-else-if="convergeOutcome" class="status-tag" :class="{ ok: convergeOutcome.startsWith('converged') }">{{ convergeOutcome }}</span>
       </div>
     </div>
 
@@ -176,6 +269,13 @@ onBeforeUnmount(() => { cancelAnimationFrame(raf); ro?.disconnect(); renderer?.d
 .code-pane { flex: 1 1 auto; min-height: 0; display: flex; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; font-size: 0.6em; font-family: var(--font-mono, monospace); }
 .controls select { font: inherit; }
+.converge-row { gap: 0.6em; }
+.status-tag {
+  font-weight: 700; background: #fdecd9; border: 1px solid #202B4E; color: #202B4E;
+  border-radius: 999px; padding: 0.15em 0.6em;
+}
+.status-tag.ok { background: #e3f3ea; border-color: #27966b; color: #1d6e4f; }
+.status-tag.running { background: #fdecd9; }
 .viewport { flex: 1 1 auto; min-height: 0; border-radius: 8px; overflow: hidden; border: 1px solid #dcdfe6; }
 .viewport :deep(canvas) { display: block; }
 .values-pane { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 0.6em; max-height: 40%; overflow: auto; }

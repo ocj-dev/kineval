@@ -91,7 +91,7 @@ function buildScene() {
     const g = robot.links[name].geometry!
     const geom = new THREE.BoxGeometry(g.size[0], g.size[1], g.size[2])
     geom.translate(g.offset.xyz[0], g.offset.xyz[1], g.offset.xyz[2])
-    const mesh = new THREE.Mesh(geom, new THREE.MeshLambertMaterial({ color: robot.links[name].color ?? NORMAL }))
+    const mesh = new THREE.Mesh(geom, new THREE.MeshLambertMaterial({ color: robot.links[name].color ?? NORMAL, transparent: true, opacity: 0.6 }))
     mesh.matrixAutoUpdate = false
     scene.add(mesh)
     linkMeshes[name] = mesh

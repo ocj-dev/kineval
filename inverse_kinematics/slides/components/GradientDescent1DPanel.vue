@@ -3,31 +3,44 @@ import { reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { clearCanvas, INDIGO, AMBER } from '../lib/ik/drawUtils'
 import { useStepTracer } from '../lib/ik/useStepTracer'
 
-// Gradient descent on a 1D function with multiple local minima/maxima --
-// f(x) = cos(3*pi*x)/x on 0 < x <= 2 (x=0 excluded: undefined, so the
-// domain stays strictly positive). Derivative by the quotient rule:
-//   f'(x) = (-3*pi*x*sin(3*pi*x) - cos(3*pi*x)) / x^2
-// verified against a central finite-difference check at several sample
-// points in Node before shipping this panel (agreement to ~1e-9 at every
-// sample point checked) -- same "verify every quantitative claim before
-// publishing" discipline this project's Whitney-citation slide names.
+// Gradient descent on an asymmetric double-well -- exactly ONE global
+// minimum, ONE local minimum, and the local maximum separating them:
+//   f(x) = (x^2 - 1)^2 + c*x,  c = 0.5, on -2 <= x <= 2
+// Derivative and second derivative:
+//   f'(x)  = 4x^3 - 4x + c
+//   f''(x) = 12x^2 - 4
+// c = 0.5 was chosen after root-finding f'(x) = 0 over [-2, 2] and
+// classifying each root via f''(x): EXACTLY three critical points, in
+// order min / max / min --
+//   x ~= -1.057  (f ~= -0.5148)  GLOBAL minimum, f'' = 9.40 > 0
+//   x ~=  0.127  (f ~=  1.0315)  local maximum,  f'' = -3.81 < 0
+//   x ~=  0.930  (f ~=  0.4833)  local minimum,  f'' = 6.38 > 0
+// -- two clearly-distinct minima (f-values ~1.0 apart) with both endpoints
+// (f(-2)=8, f(2)=10) well above either, confirming -1.057 is the global
+// minimum over the whole domain, not just locally. f'(x) also verified
+// against a central finite-difference check at several sample points in
+// Node before shipping this panel (agreement to ~1e-10) -- same "verify
+// every quantitative claim before publishing" discipline this project's
+// Whitney-citation slide names.
 //
-// The point of this panel: which minimum gradient descent settles into
-// depends entirely on the starting x -- drag "start x" across the domain
-// and watch it land in different valleys, or oscillate without settling
-// near the steep part close to x=0. That's a real limitation, and this
-// deck's Jacobian-based IK (ahead) inherits the exact same one: multiple
-// solutions / local minima in configuration space, not just in this toy 1D
-// example.
+// The point of this panel: which well gradient descent settles into
+// depends deterministically on which side of the local max (x ~= 0.127)
+// the start x sits on -- drag "start x" across the domain and watch it
+// always fall into the SAME well from the SAME side, a cleaner
+// illustration of start-point-dependence than an oscillating function
+// gives. This deck's Jacobian-based IK (ahead) inherits the same idea:
+// multiple solutions / local minima in configuration space, not just in
+// this toy 1D example.
 
+const C = 0.5
 function f(x: number): number {
-  return Math.cos(3 * Math.PI * x) / x
+  return (x * x - 1) * (x * x - 1) + C * x
 }
 function fprime(x: number): number {
-  return (-3 * Math.PI * x * Math.sin(3 * Math.PI * x) - Math.cos(3 * Math.PI * x)) / (x * x)
+  return 4 * x * x * x - 4 * x + C
 }
 
-const DOMAIN_MIN = 0.03 // strictly positive -- f(0) is undefined
+const DOMAIN_MIN = -2
 const DOMAIN_MAX = 2
 
 interface GdStep { x: number; fx: number; slope: number }
@@ -45,7 +58,7 @@ function buildTrace(): GdStep[] {
     steps.push({ x, fx, slope })
     if (Math.abs(slope) < 1e-3) break
     const next = x - params.gamma * slope
-    if (!isFinite(next) || next <= DOMAIN_MIN || next > DOMAIN_MAX) break
+    if (!isFinite(next) || next < DOMAIN_MIN || next > DOMAIN_MAX) break
     if (Math.abs(next - x) < 1e-7) break
     x = next
   }
@@ -163,7 +176,7 @@ const fmt = (v: number) => (v >= 0 ? ' ' : '') + v.toFixed(4)
 <template>
   <div class="gd1d-shell">
     <div class="controls">
-      <label>start x <input v-model.number="params.startX" type="range" min="0.05" max="2" step="0.01"></label>
+      <label>start x <input v-model.number="params.startX" type="range" min="-2" max="2" step="0.01"></label>
       <span class="val">{{ params.startX.toFixed(2) }}</span>
       <label>step size &gamma; <input v-model.number="params.gamma" type="range" min="0.001" max="0.05" step="0.001"></label>
       <span class="val">{{ params.gamma.toFixed(3) }}</span>

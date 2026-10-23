@@ -16,14 +16,24 @@ import { useStepTracer } from '../lib/ik/useStepTracer'
 //
 // g_target = (0, 2) is reachable exactly: g(1,1) = (1-1, 1+1) = (0,2), so
 // cost C(x,y) = ||g_target - g(x,y)||^2 has an exact zero at (x,y) = (1,1).
-// Starting from (-1, 1.5) (cost 0.8125), gradient descent on C takes the
-// SAME update shape iterateIK uses: form the real Jacobian at the current
-// point, compute error e = g_target - g(x,y), update via dq = J^T e
-// (transpose method, to keep this bridge slide simple and consistent with
-// this deck's gradient-descent framing), scaled by a step length -- and
-// the marker below descends the real C(x,y) surface along its actual
-// trajectory while the left panel prints the numeric Jacobian and update
-// at every step.
+// Starting from (x0,y0) (default (-1, 1.5), cost 0.8125), gradient descent
+// on C takes the SAME update shape iterateIK uses: form the real Jacobian
+// at the current point, compute error e = g_target - g(x,y), update via
+// dq = J^T e (transpose method, to keep this bridge slide simple and
+// consistent with this deck's gradient-descent framing), scaled by a step
+// length -- and the marker below descends the real C(x,y) surface along
+// its actual trajectory while the left panel prints the numeric Jacobian
+// and update at every step.
+//
+// Start point (x0, y0) is settable two ways: the sliders below, or
+// clicking directly on the ground plane in the 3D view -- same
+// raycast-a-pointer-against-a-plane technique IkConvergePanel.vue uses for
+// its drag-to-set-target interaction, just against the fixed y=0 ground
+// plane the cost surface is built over (not a camera-facing plane through
+// a marker, since this plane never has to face the camera -- it's always
+// horizontal), and a single click rather than a full drag state machine,
+// since this panel only needs the one point before retracing, not a
+// continuously-followed live target the way IkConvergePanel's IS.
 
 function g(x: number, y: number): [number, number] {
   return [x * x - y, x + y * y]
@@ -45,14 +55,13 @@ interface Gd2Step {
   dq: [number, number]
 }
 
-const params = reactive({ gamma: 0.05 })
-const START: [number, number] = [-1, 1.5]
+const params = reactive({ gamma: 0.05, x0: -1, y0: 1.5 })
 const speedMs = ref(180)
 const tracer = useStepTracer<Gd2Step>(speedMs)
 
 function buildTrace(): Gd2Step[] {
   const steps: Gd2Step[] = []
-  let x = START[0], y = START[1]
+  let x = params.x0, y = params.y0
   for (let i = 0; i < 80; i++) {
     const [gx, gy] = g(x, y)
     const e: [number, number] = [TARGET[0] - gx, TARGET[1] - gy]
@@ -80,6 +89,9 @@ let raf = 0
 let marker: THREE.Mesh
 let trajLine: THREE.Line
 let targetMarker: THREE.Mesh
+let startMarker: THREE.Mesh
+const raycaster = new THREE.Raycaster()
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0) // y = 0, the same ground the surface is built over
 
 const GRID_X_MIN = -2.0, GRID_X_MAX = 1.2
 const GRID_Y_MIN = -1.2, GRID_Y_MAX = 2.2
@@ -156,16 +168,49 @@ function buildScene() {
   marker = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), new THREE.MeshLambertMaterial({ color: 0xe8710a }))
   scene.add(marker)
 
+  // start marker: sits ON the ground plane (y=0) at (x0, y0) -- draggable
+  // target for "click the ground to set the start point", distinct from
+  // the orange "current point on the surface" marker above.
+  startMarker = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.14, 20), new THREE.MeshLambertMaterial({ color: 0x2e6fd9 }))
+  startMarker.rotation.x = Math.PI // point tip down, into the ground
+  scene.add(startMarker)
+
   const trajGeom = new THREE.BufferGeometry()
   trajGeom.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(3 * 200), 3))
   trajLine = new THREE.Line(trajGeom, new THREE.LineBasicMaterial({ color: 0x9b59b6 }))
   scene.add(trajLine)
 
+  renderer.domElement.addEventListener('click', onCanvasClick)
+
   const loop = () => { raf = requestAnimationFrame(loop); controls.update(); renderer!.render(scene, camera) }
   loop()
 }
 
+function pointerNdc(e: PointerEvent | MouseEvent): THREE.Vector2 {
+  const rect = (renderer!.domElement as HTMLCanvasElement).getBoundingClientRect()
+  return new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+}
+
+// Click anywhere on the 3D view -> raycast against the ground plane (the
+// same plane the cost surface sits over) -> set (x0, y0) to the clicked
+// location (clamped to the grid this panel actually draws) -> retrace.
+// Same raycast-a-pointer-against-a-plane technique IkConvergePanel.vue
+// uses to drag its target; here one click is enough since there's no
+// continuously-followed live point to track.
+function onCanvasClick(e: MouseEvent) {
+  const ndc = pointerNdc(e)
+  raycaster.setFromCamera(ndc, camera)
+  const hit = new THREE.Vector3()
+  if (!raycaster.ray.intersectPlane(groundPlane, hit)) return
+  params.x0 = Math.min(GRID_X_MAX, Math.max(GRID_X_MIN, hit.x))
+  params.y0 = Math.min(GRID_Y_MAX, Math.max(GRID_Y_MIN, hit.z))
+  retrace()
+  syncScene()
+}
+
 function syncScene() {
+  startMarker.position.set(params.x0, 0.07, params.y0)
+
   const visited = tracer.steps.value.slice(0, Math.max(0, tracer.pos.value + 1))
   const pos = trajLine.geometry.attributes.position as THREE.BufferAttribute
   const cap = Math.min(visited.length, pos.count)
@@ -199,9 +244,14 @@ onMounted(() => {
   retrace()
   syncScene()
 })
-onBeforeUnmount(() => { cancelAnimationFrame(raf); ro?.disconnect(); renderer?.dispose() })
+onBeforeUnmount(() => {
+  cancelAnimationFrame(raf)
+  ro?.disconnect()
+  renderer?.domElement.removeEventListener('click', onCanvasClick)
+  renderer?.dispose()
+})
 
-watch(() => params.gamma, () => { retrace(); syncScene() })
+watch(() => [params.gamma, params.x0, params.y0], () => { retrace(); syncScene() })
 
 const fmt = (v: number) => (v >= 0 ? ' ' : '') + v.toFixed(4)
 </script>
@@ -213,6 +263,13 @@ const fmt = (v: number) => (v >= 0 ? ' ' : '') + v.toFixed(4)
         <label>step length &gamma; <input v-model.number="params.gamma" type="range" min="0.005" max="0.12" step="0.005"></label>
         <span class="val">{{ params.gamma.toFixed(3) }}</span>
       </div>
+      <div class="controls">
+        <label>start x<sub>0</sub> <input v-model.number="params.x0" type="range" :min="GRID_X_MIN" :max="GRID_X_MAX" step="0.05"></label>
+        <span class="val">{{ params.x0.toFixed(2) }}</span>
+        <label>start y<sub>0</sub> <input v-model.number="params.y0" type="range" :min="GRID_Y_MIN" :max="GRID_Y_MAX" step="0.05"></label>
+        <span class="val">{{ params.y0.toFixed(2) }}</span>
+      </div>
+      <div class="hint" style="margin-top:0">or click the ground plane in the 3D view to set (x<sub>0</sub>, y<sub>0</sub>) directly (blue marker)</div>
       <div class="playback">
         <button class="btn" :disabled="tracer.isAtStart.value" @click="tracer.stepBack">&laquo; Step</button>
         <button v-if="!tracer.isRunning.value" class="btn primary" :disabled="tracer.isDone.value" @click="tracer.play">&#9654; Play</button>
@@ -241,8 +298,8 @@ const fmt = (v: number) => (v >= 0 ? ' ' : '') + v.toFixed(4)
 <style scoped>
 .gd2d-shell { display: grid; grid-template-columns: 0.95fr 1.05fr; gap: 0.7em; height: 100%; min-height: 0; }
 .left { display: flex; flex-direction: column; gap: 0.5em; min-height: 0; min-width: 0; font-family: var(--font-mono, monospace); font-size: 0.64em; }
-.controls { display: flex; align-items: center; gap: 0.5em; }
-.controls input[type="range"] { width: 7em; }
+.controls { display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; }
+.controls input[type="range"] { width: 6em; }
 .val { opacity: 0.7; }
 .playback { display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; }
 .readout { border: 1px solid #dcdfe6; border-radius: 8px; background: #fff; padding: 0.4em 0.6em; display: flex; flex-direction: column; gap: 0.2em; }
