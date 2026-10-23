@@ -205,17 +205,13 @@ const fmt = (v: number) => (v < 0 ? '' : ' ') + v.toFixed(2)
           </tr>
         </table>
       </div>
-    </div>
 
-    <div class="right">
       <div class="controls">
         <label v-for="n in chainJointNames" :key="n" class="js">
           <span>{{ n }}</span>
           <input v-model.number="jointAngles[n]" type="range" min="-3.14159" max="3.14159" step="0.01">
         </label>
       </div>
-
-      <div ref="viewport" class="viewport" />
 
       <div class="playback">
         <button class="btn" :disabled="tracer.isAtStart.value" @click="tracer.stepBack">&laquo; Step</button>
@@ -227,17 +223,22 @@ const fmt = (v: number) => (v < 0 ? '' : ' ') + v.toFixed(2)
         <span class="frame-count">step {{ Math.max(0, tracer.pos.value + 1) }} / {{ tracer.stepCount.value }}</span>
       </div>
     </div>
+
+    <div class="right">
+      <div ref="viewport" class="viewport" />
+    </div>
   </div>
 </template>
 
 <style scoped>
-.jac-shell { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 0.7em; height: 100%; min-height: 0; }
-.left, .right { display: flex; flex-direction: column; min-height: 0; min-width: 0; gap: 0.4em; }
-.code-pane { flex: 1 1 auto; min-height: 0; display: flex; }
+.jac-shell { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 0.7em; height: 100%; min-height: 0; }
+.left, .right { display: flex; flex-direction: column; min-height: 0; min-width: 0; gap: 0.35em; }
+.left { overflow-y: auto; }
+.code-pane { flex: 0 1 150px; min-height: 90px; display: flex; }
 
 .jac-pane {
   flex: 0 0 auto; border: 1px solid #dcdfe6; border-radius: 8px; background: #fff;
-  padding: 0.35em 0.5em; font-family: var(--font-mono, monospace); font-size: 0.6em; max-height: 44%;
+  padding: 0.35em 0.5em; font-family: var(--font-mono, monospace); font-size: 0.6em; max-height: 30%;
   overflow: auto;
 }
 .jac-title { font-weight: 700; color: var(--indigo, #202B4E); margin-bottom: 0.3em; }
@@ -246,14 +247,14 @@ const fmt = (v: number) => (v < 0 ? '' : ' ') + v.toFixed(2)
 .jac-table { border-collapse: collapse; }
 .jac-table td { padding: 0.1em 0.5em; text-align: right; border-bottom: 1px solid #eee; }
 
-.controls { display: flex; flex-wrap: wrap; gap: 0.5em; }
+.controls { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 0.5em; }
 .js { display: flex; align-items: center; gap: 0.25em; font-size: 0.62em; font-family: var(--font-mono, monospace); }
 .js input[type="range"] { width: 4.6em; }
 
 .viewport { flex: 1 1 auto; min-height: 0; border-radius: 8px; overflow: hidden; border: 1px solid #dcdfe6; }
 .viewport :deep(canvas) { display: block; }
 
-.playback { display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; }
+.playback { flex: 0 0 auto; display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; }
 .phase-tag {
   font-family: var(--font-mono, monospace); font-size: 0.62em; font-weight: 700;
   background: #fdecd9; border: 1px solid #202B4E; color: #202B4E; border-radius: 999px; padding: 0.15em 0.6em;

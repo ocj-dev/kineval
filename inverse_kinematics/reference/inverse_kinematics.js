@@ -121,12 +121,24 @@ function computeManipulatorJacobian(robot, chainJointNames, endeffector_joint, e
         // never changes the stack's translation column).
         p_i = [joint.matrix[0][3], joint.matrix[1][3], joint.matrix[2][3]];
 
-        // linear velocity column of a revolute joint: z_i x (p_ee - p_i)
-        linear = vector_cross(z_i, vector_subtract(p_ee, p_i));
+        if (joint.type === 'prismatic') {
+            // prismatic joint (fetch's torso_lift_joint is the only one any
+            // ported robot's arm chain actually passes through): sliding
+            // along the joint's own world axis IS the end-effector's motion
+            // directly -- no cross product, since translating along a line
+            // doesn't rotate anything downstream. The angular column (only
+            // used when solving for orientation too) is the zero vector:
+            // a prismatic joint contributes zero angular velocity.
+            linear = z_i;
+            column = includeOrientation ? linear.concat([0, 0, 0]) : linear;
+        } else {
+            // linear velocity column of a revolute joint: z_i x (p_ee - p_i)
+            linear = vector_cross(z_i, vector_subtract(p_ee, p_i));
 
-        // angular velocity column (only when solving for orientation too)
-        // is just the joint's own world rotation axis
-        column = includeOrientation ? linear.concat(z_i) : linear;
+            // angular velocity column (only when solving for orientation
+            // too) is just the joint's own world rotation axis
+            column = includeOrientation ? linear.concat(z_i) : linear;
+        }
         columns.push(column);
     }
 

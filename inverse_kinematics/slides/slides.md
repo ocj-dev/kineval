@@ -51,76 +51,60 @@ module's buildFKTransforms.
 layout: default
 ---
 
-# Why inverse kinematics is harder than forward kinematics
+# Forward kinematics, briefly
 
 <div class="panel text-sm">
 
-Forward kinematics is a closed-form evaluation: given joint angles, one DFS pass over the
-kinematic tree produces a single, unique endeffector pose. Inverse kinematics inverts that
-question -- given a *desired* endeffector pose, find joint angles that produce it -- and loses every
-one of those closed-form guarantees:
-
-- **rarely closed-form.** A general kinematic chain's forward-kinematics map has no algebraic
-  inverse; only special chain geometries (certain 6-DOF arms) admit one
-- **multiple solutions.** A 2-link planar arm reaching a point in front of it can bend its elbow up
-  *or* down -- both configurations are valid
-- **zero solutions.** A target outside the chain's reachable workspace has no solution at all
-- **redundancy.** A chain with more joints than the task has dimensions (mr2's 4-joint arm against a
-  3D position target, for instance) has *infinitely many* solutions
+A quick recap before inverting anything: forward kinematics takes joint angles in and produces a
+single, unique endeffector pose out, via one depth-first pass over the kinematic tree, composing
+each joint's local transform onto its parent's as it goes (`buildFKTransforms`, this project's
+forward-kinematics module). No iteration, no ambiguity -- one set of joint angles, one pose, every
+time.
 
 </div>
 
-<div class="history-note">
-<b>Two ways forward</b>
-The lecture frames exactly two responses: a <b>closed-form</b> geometric solution -- fast, predictable,
-but derived by hand per robot -- or <b>solving by optimization</b>, minimizing endeffector error with
-something like gradient descent. This module builds the second: one solver (Jacobian-based
-iteration) that works across different robots without a per-robot derivation.
+<div class="panel text-sm" style="margin-top:0.4em">
+
+This deck assumes that machinery already exists and is correct -- every `joint.matrix`/`link.matrix`
+read anywhere in this module (`computeManipulatorJacobian`'s `z_i`/`p_i`, `iterateIK`'s `p_ee`) was
+put there by that same DFS pass. For the full derivation -- the matrix stack, quaternion composition,
+the traversal itself -- see the forward-kinematics deck:
+<a href="https://ocj-dev.github.io/kineval/forward_kinematics/" target="_blank">ocj-dev.github.io/kineval/forward_kinematics/</a>.
+
 </div>
 
 ---
 layout: default
 ---
 
-# Motivating demo: tuning a Jacobian-transpose solver
+# The inverse kinematics problem
 
-<div class="panel text-sm" style="padding:0.6em 0.9em">
+<div class="panel text-sm" style="padding:0.55em 0.9em">
 
-The lecture opens with a live Scratch IK demo (a reaching arm chasing the mouse) before deriving
-anything -- the same aggressive-vs-conservative tuning tradeoff every iterative solver in this deck
-will show. Two runs of the *same* Jacobian-transpose solver, differing only in step size:
+Forward kinematics answers "given joint angles, where is the endeffector?" Inverse kinematics asks
+the reverse: given a *desired* endeffector pose, find joint angles that produce it -- and loses every
+one of forward kinematics' closed-form guarantees:
 
-</div>
-
-<div class="split-panel" style="margin-top:0.3em; height:auto; flex:0 0 auto">
-<div>
-
-<div class="panel" style="padding:0.6em 0.9em">
-
-**Aggressively tuned**
-- large step length per iteration
-- snaps toward the target fast
-- overshoots, can oscillate or jitter near convergence
+- **rarely closed-form** -- only special chain geometries (certain 6-DOF arms) admit an algebraic inverse
+- **multiple solutions** -- a 2-link planar arm reaching a point can bend its elbow up *or* down
+- **zero solutions** -- a target outside the chain's reachable workspace has no solution at all
+- **redundancy** -- more joints than task dimensions (mr2's 4-joint arm vs. a 3D target) means
+  *infinitely many* solutions
 
 </div>
-</div>
-<div>
 
-<div class="panel" style="padding:0.6em 0.9em">
+<div class="panel text-sm" style="margin-top:0.35em; padding:0.55em 0.9em">
 
-**Conservatively tuned**
-- small step length per iteration
-- smooth, stable approach
-- visibly slower to converge
-
-</div>
-</div>
-</div>
-
-<div class="panel text-sm" style="margin-top:0.3em; padding:0.6em 0.9em">
-
-This module's own `ikParams.steplength` is exactly this dial -- the convergence panel later in this
-deck lets you drag it live and watch the same tradeoff play out on a real chain.
+**Four realistic families of solutions**
+- **Optimization** -- minimize endeffector error by Jacobian-based iteration; what the rest of this
+  deck builds
+- **Closed-form / algebraic** -- hand-derived per-robot geometric solutions; fast and exact, but not general
+- **CCD (cyclic coordinate descent)** -- no Jacobian, adjusts one joint at a time from the endeffector
+  back toward the base; this deck's own dedicated slide (just ahead) walks through it
+- **FABRIK** (Forward And Backward Reaching Inverse Kinematics) -- a point-based iterative heuristic,
+  also no Jacobian (**Aristidou &amp; Lasenby, 2011**, <i>Graphical Models</i>, vol. 73, no. 5, pp.
+  243&ndash;260 -- verified against the published record, same discipline this deck's Whitney-1969
+  citation uses)
 
 </div>
 
@@ -220,6 +204,28 @@ directly (see this slide's own code quote for why).
 layout: default
 ---
 
+# Interactive: drag a target, watch it converge
+
+<div class="panel text-sm" style="margin-bottom:0.4em">
+
+Before building each piece -- the Jacobian, the error term, the solve methods -- watch the whole loop
+run end to end. Drag the magenta sphere anywhere in 3D; the arm converges toward it **live**, solved by
+`runIkIteration` -- the same TS port of `iterateIK` this deck's later step-through panel calls, not a
+separately-tuned approximation for the picture. Switch methods and watch the qualitative difference
+this deck's upcoming derivations will explain: `transpose` is cheap but can wander or oscillate near
+convergence; `pseudoinverse` is the least-squares-optimal direction but can swing wildly approaching a
+near-singular pose; `damped` trades a little accuracy there for staying bounded.
+
+</div>
+
+<div class="content-body">
+<IkConvergePanel robot-name="mr2" />
+</div>
+
+---
+layout: default
+---
+
 # `robotInverseKinematics`: the per-frame gate
 
 <<< ../reference/inverse_kinematics.js#robot-inverse-kinematics {*}{lines:true,startLine:63,maxHeight:'260px'}
@@ -241,6 +247,8 @@ layout: default
 
 <div class="panel">
 
+0. **Gradient descent** -- the general optimization idea every "solve method" below specializes:
+   minimize a cost by repeatedly stepping opposite its gradient
 1. **Manipulator Jacobian construction** -- `computeManipulatorJacobian`, one column per chain joint
 2. **The error term** -- `robot.dx`, position-only vs. 6D pose with quaternion orientation error
 3. **Solve methods** -- transpose, pseudoinverse (left/right), damped least squares
@@ -250,6 +258,72 @@ layout: default
    `iterateIK` itself
 7. **Test cases**: `urdf_example`, `mr2`, and more via `infrastructure.js`'s URL-param harness
 
+</div>
+
+---
+layout: default
+---
+
+# 0. Gradient descent
+
+<div class="panel text-sm">
+
+Gradient descent is the general-purpose idea underneath every "solve method" this deck builds: to
+minimize a cost, repeatedly step **opposite** its gradient (the direction of steepest increase),
+scaled by a step size. In one dimension, minimizing a scalar function `f(x)`:
+
+</div>
+
+<div class="panel" style="margin-top:0.4em; font-family:var(--font-mono); font-size:0.85em; text-align:center">
+
+x<sub>n+1</sub> = x<sub>n</sub> &minus; &gamma; f&prime;(x<sub>n</sub>)
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+generalizes directly to higher dimensions, replacing the scalar derivative with a gradient vector:
+
+</div>
+
+<div class="panel" style="margin-top:0.4em; font-family:var(--font-mono); font-size:0.85em; text-align:center">
+
+x<sub>n+1</sub> = x<sub>n</sub> &minus; &gamma; &nabla;f(x<sub>n</sub>)
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+This is exactly the shape of `iterateIK`'s own update -- `dq = ...; joint.control += steplength * dq`.
+This deck's **transpose** method *is* gradient descent on squared endeffector error: this deck's own
+appendix derives that directly (cost in `dq`, its derivative, evaluated at `dq = 0`, yielding the
+boxed `&gamma;J<sup>T</sup>dx` result by moving opposite the gradient -- see "Appendix: Jacobian
+transpose, the full derivation").
+
+</div>
+
+---
+layout: default
+---
+
+# Interactive: gradient descent on a 1D function
+
+<div class="panel text-sm" style="margin-bottom:0.4em">
+
+Minimizing **f(x) = cos(3&pi;x) / x** on **0 &lt; x &le; 2** (x = 0 is undefined, so the domain stays
+strictly positive) by the exact update from the previous slide: **x<sub>n+1</sub> = x<sub>n</sub>
+&minus; &gamma;f&prime;(x<sub>n</sub>)**, with **f&prime;(x) = (&minus;3&pi;x&middot;sin(3&pi;x)
+&minus; cos(3&pi;x)) / x&sup2;** by the quotient rule (verified against a central finite-difference
+check before shipping this panel). The oscillating `cos(3&pi;x)` term gives this function multiple
+local minima and maxima on `(0, 2]` -- drag the starting `x` across the domain and watch gradient
+descent land in *different* valleys, or fail to settle at all near the steep region close to zero.
+That's a real limitation, and the Jacobian-based IK the rest of this deck builds inherits it too:
+multiple solutions, local minima, and an outcome that depends on where you start.
+
+</div>
+
+<div class="content-body">
+<GradientDescent1DPanel />
 </div>
 
 ---
@@ -277,6 +351,28 @@ how would the endeffector move?" Stack one column per joint, base to endeffector
 the endeffector's velocity for *any* combination of joint velocities `dq` -- linear in `dq`, even
 though the underlying forward-kinematics map is not.
 
+</div>
+
+---
+layout: default
+---
+
+# Interactive: Jacobian vector expressions, `urdf_example`
+
+<div class="panel text-sm" style="margin-bottom:0.4em">
+
+Every chain joint's per-column math, all at once, instantiated with `urdf_example`'s actual numbers at
+its current pose -- the same **z<sub>i</sub> = R<sub>i</sub> &middot; axis<sub>i</sub>**, **p<sub>i</sub>
+= translation(R<sub>i</sub>)**, lever arm **= p<sub>ee</sub> &minus; p<sub>i</sub>**, and column
+**J<sub>vi</sub> = z<sub>i</sub> &times; (p<sub>ee</sub> &minus; p<sub>i</sub>)** the next few slides
+derive, and the following `computeManipulatorJacobian` build-through panel steps through one joint at
+a time. Pick a joint from the dropdown to highlight its axis arrow and lever-arm vector at full
+saturation against the rest of the chain, rendered at 60% opacity.
+
+</div>
+
+<div class="content-body">
+<JacobianExpressionPanel robot-name="urdf_example" />
 </div>
 
 ---
@@ -346,40 +442,7 @@ layout: default
 layout: default
 ---
 
-# A subtlety: whose rotation is `joint.matrix`?
-
-<div class="panel text-sm">
-
-`z_i` is built from `joint.matrix`'s own rotation block -- but `joint.matrix` already includes *this*
-joint's own current-angle rotation (`traverseFKJoint` folds it in before returning). That looks like
-it should matter and doesn't: rotating a vector about itself leaves it unchanged, and `joint.axis` is
-exactly the axis `joint.matrix`'s own rotation turns about. So
-**R<sub>ancestors</sub>R<sub>fixed</sub>R<sub>own</sub>** applied to `joint.axis` gives the identical
-result as **R<sub>ancestors</sub>R<sub>fixed</sub>** alone would. Only *ancestor* joints' rotations
-ever change the direction of a joint's own axis; a joint's own angle never does -- which is also why
-`p_i`, read straight off `joint.matrix`'s translation column, needs no special-casing either (a pure
-rotation appended to a matrix stack never moves the stack's translation column).
-
-</div>
-
----
-layout: default
----
-
 # Interactive: building the Jacobian, `urdf_example`
-
-<div class="panel text-sm" style="margin-bottom:0.4em">
-
-Step through `computeManipulatorJacobian`'s own loop one joint at a time: the amber arrow is that
-joint's world axis **z<sub>i</sub>**, the purple arrow is the lever arm from the joint's origin to the
-endeffector (magenta), and the running `robot.jacobian` on the left grows one column per step.
-`urdf_example`'s chain is **joint2 &rarr; joint3** -- **not** `joint1`, even though `joint1` also hangs
-off `link1`: **joint1 &rarr; link2** is a dead-end sibling branch the endeffector never passes through,
-so a column for it would be identically zero (z<sub>i</sub> &times; a lever arm of length zero
-*from that joint's own disconnected subtree* isn't even meaningful -- it's simply not an ancestor of
-the endeffector frame at all).
-
-</div>
 
 <div class="content-body">
 <JacobianBuildPanel robot-name="urdf_example" />
@@ -389,18 +452,7 @@ the endeffector frame at all).
 layout: default
 ---
 
-# Interactive: building the Jacobian, `mr2`'s right arm
-
-<div class="panel text-sm" style="margin-bottom:0.4em">
-
-`mr2`'s chain is four revolute joints, `clavicle_right_yaw &rarr; shoulder_right_yaw &rarr;
-upperarm_right_pitch &rarr; forearm_right_yaw`, with the endeffector offset `(0, 0, 0.5)` local to the
-last joint. `clavicle_left_roll` is a *disconnected sibling branch* off `base` -- upstream's own left
-arm, left unfinished as an exercise -- and is excluded from the chain for the same reason
-`urdf_example`'s `joint1` was: it is not an ancestor of the endeffector frame, so it contributes
-nothing to how the endeffector moves.
-
-</div>
+# Interactive: building the Jacobian, `mr2`
 
 <div class="content-body">
 <JacobianBuildPanel robot-name="mr2" />
@@ -478,112 +530,23 @@ three slides derive each in turn; all three branch inside the same function, sho
 layout: default
 ---
 
-# Jacobian transpose: error minimization, <span class="accent">corrected</span>
+# Interactive: gradient descent in 3D -- a two-variable example
 
-<div class="panel text-sm" style="padding:0.6em 0.9em">
+<div class="panel text-sm" style="margin-bottom:0.4em">
 
-Define squared endeffector error as a cost in `dq`, take its derivative, evaluate at `dq = 0` (the
-start of each iteration):
-
-</div>
-
-<div class="panel" style="margin-top:0.3em; padding:0.5em 0.9em; font-family:var(--font-mono); font-size:0.74em; line-height:1.6">
-
-C = &Delta;q<sup>T</sup>J<sup>T</sup>J&Delta;q &minus; 2&Delta;q<sup>T</sup>J<sup>T</sup>&Delta;x + &Delta;x<sup>T</sup>&Delta;x &nbsp;&rarr;&nbsp;
-dC/d&Delta;q = 2J<sup>T</sup>J&Delta;q &minus; 2J<sup>T</sup>&Delta;x &nbsp;&rarr;&nbsp;
-dC/d&Delta;q |<sub>&Delta;q=0</sub> = &minus;2J<sup>T</sup>&Delta;x
+The bridge from Step 0's scalar-function gradient descent to the vector-valued manipulator Jacobian
+the rest of this deck uses: **g(x,y) = (x&sup2; &minus; y, x + y&sup2;)**, a map from R&sup2; to
+R&sup2; with Jacobian **J(x,y) = [[2x, &minus;1], [1, 2y]]** (verified against a central
+finite-difference check before shipping this panel). Minimizing **C(x,y) = &#8741;g<sub>target</sub>
+&minus; g(x,y)&#8741;&sup2;** by the *same* update shape `iterateIK` uses -- form the real Jacobian at
+the current point, compute the error, update via **dq = J<sup>T</sup>e** (transpose method, for
+consistency with this deck's gradient-descent framing) -- descends the cost surface below exactly like
+the 1D panel descended a curve, just one dimension higher.
 
 </div>
 
-<div class="panel text-sm" style="margin-top:0.3em; padding:0.5em 0.9em; border-color:#c0392b; background:#fdf2f1">
-
-<b style="color:#c0392b">Correcting lecture p. 86:</b> its next line drops the minus sign, showing
-<code>= 2J<sup>T</sup>&Delta;x</code> boxed as <code>&gamma;J<sup>T</sup>&Delta;x</code> -- skipping
-the justifying step. That step is to <b>move opposite the gradient</b> (update by &minus;&gamma; times
-the derivative): the two minus signs cancel, the sign flip absorbed into step length &gamma;:
-
-</div>
-
-<div class="panel" style="margin-top:0.3em; padding:0.4em 0.9em; font-family:var(--font-mono); font-size:0.78em; border-color:#202B4E">
-
-&minus;&gamma;(&minus;2J<sup>T</sup>&Delta;x) = <b>&gamma;J<sup>T</sup>&Delta;x</b> &nbsp;&larr;&nbsp; same boxed result, same convention this project's FK deck used for its own lecture corrections
-
-</div>
-
----
-layout: default
----
-
-# Jacobian pseudoinverse: left form, right form
-
-<div class="panel text-sm">
-
-The lecture's own IK-specific derivation (pp. 88&ndash;91) sets **dC/d&Delta;q = 0** and solves the
-**normal equations** directly: **&Delta;q = (J<sup>T</sup>J)<sup>-1</sup>J<sup>T</sup>&Delta;x** -- the
-**left** (tall) pseudoinverse form. A later, separate "Which Pseudoinverse" slide (pp. 96&ndash;97)
-does state both forms generically for an N&times;M matrix -- but never reconnects that back to say
-*a redundant real robot's Jacobian is usually the wide case*, leaving a gap this slide fills:
-
-</div>
-
-<div class="split-panel" style="margin-top:0.4em; height:auto; flex:0 0 auto">
-<div>
-
-<div class="panel">
-
-**Left (tall): rows &ge; cols**<br>J<sup>+</sup> = (J<sup>T</sup>J)<sup>-1</sup>J<sup>T</sup><br>fewer joints than task dimensions (overdetermined)
-
-</div>
-</div>
-<div>
-
-<div class="panel">
-
-**Right (wide): rows &lt; cols**<br>J<sup>+</sup> = J<sup>T</sup>(JJ<sup>T</sup>)<sup>-1</sup><br>more joints than task dimensions (redundant, underdetermined)
-
-</div>
-</div>
-</div>
-
-<div class="panel text-sm" style="margin-top:0.4em">
-
-For a wide `J`, **J<sup>T</sup>J** is **singular** (**(J<sup>T</sup>J)<sup>-1</sup>** doesn't exist), so
-the left form breaks down exactly where it matters most: `mr2`'s position-only Jacobian is 3 rows
-(x,y,z) by 4 columns (4 chain joints) -- wide -- so only the right form actually works, matching this
-project's own worksheet finding that **det(J<sup>T</sup>J) &asymp; 0** there. `matrix_pseudoinverse`
-(next slide) branches on exactly `rows >= cols` for exactly this reason.
-
-</div>
-
----
-layout: default
----
-
-# Damped least squares: regularizing near singularities
-
-<div class="panel text-sm">
-
-Both forms above divide by something that can be exactly (or nearly) singular. **Damped least
-squares** (Levenberg-Marquardt) adds a regularization term to the normal equations before inverting:
-
-</div>
-
-<div class="panel" style="margin-top:0.4em; font-family:var(--font-mono); font-size:0.85em; text-align:center">
-
-&Delta;q = (J<sup>T</sup>J + &lambda;<sup>2</sup>I)<sup>-1</sup> J<sup>T</sup>&Delta;x
-
-</div>
-
-<div class="panel text-sm" style="margin-top:0.4em">
-
-**&lambda;** (`ikParams.damping`) penalizes large joint displacements directly in the cost being
-minimized, so **J<sup>T</sup>J + &lambda;<sup>2</sup>I** stays invertible even when **J<sup>T</sup>J**
-alone is singular or near it -- the diagonal boost keeps every eigenvalue strictly positive. The
-reference implementation adds **&lambda;<sup>2</sup>** directly onto **J<sup>T</sup>J**'s diagonal rather
-than building a separate **&lambda;<sup>2</sup>I** matrix and adding it (`matrix.js` has no
-scalar-multiply/matrix-add helpers, and `generate_identity` is a fixed 4&times;4, sized for
-homogeneous transforms, not this chain's joint count) -- same numeric result, fewer helpers.
-
+<div class="content-body">
+<GradientDescent2DPanel />
 </div>
 
 ---
@@ -668,11 +631,11 @@ layout: default
 
 Every method above produces `robot.dq` **without** the step length folded in -- `iterateIK`'s own
 `[NOTICE]` comment keeps `robot.dx`/`robot.jacobian`/`robot.dq` as the raw, gradable values, and only
-scales by `ikParams.steplength` when actually writing `.control`. Too large a step overshoots (the
-aggressive tuning from this deck's opening demo); too small converges slowly. One more defensive
-guard: if any `dq[i]` comes back non-finite (a genuinely singular, unregularized configuration under
-`pseudoinverse`), the whole iteration's `.control` write is skipped rather than corrupting `.angle`
-with a `NaN` that would propagate through every later `buildFKTransforms` call.
+scales by `ikParams.steplength` when actually writing `.control`. Too large a step overshoots; too
+small converges slowly. One more defensive guard: if any `dq[i]` comes back non-finite (a genuinely
+singular, unregularized configuration under `pseudoinverse`), the whole iteration's `.control` write
+is skipped rather than corrupting `.angle` with a `NaN` that would propagate through every later
+`buildFKTransforms` call.
 
 </div>
 
@@ -700,63 +663,6 @@ sequence of poses).
 </div>
 
 <<< ../reference/servo_control.js#robot-arm-controller-setpoint {*}{lines:true,startLine:88,maxHeight:'260px'}
-
----
-layout: default
----
-
-# Setpoint sources: clock movement and dance sequence
-
-<<< ../reference/servo_control.js#setpoint-clock-movement {*}{lines:true,startLine:38,maxHeight:'180px'}
-<<< ../reference/servo_control.js#setpoint-dance-sequence {*}{lines:true,startLine:55,maxHeight:'260px'}
-
----
-layout: default
----
-
-# Beyond this lab: optimization considerations
-
-<div class="panel text-sm">
-
-The lecture closes its Jacobian section with a survey of refinements this module doesn't implement,
-worth knowing exist:
-
-</div>
-
-<div class="panel">
-
-- **joint limits, multiple endeffectors, preferred poses** -- additional constraints beyond "reach
-  the target"
-- **null-space optimization** -- apply constraints hierarchically, using any slack a redundant chain
-  leaves after satisfying the primary one
-- **resolved rate** -- hold endeffector velocity at constant magnitude (Whitney's original framing)
-- **stochastic gradient descent** -- update from one randomly chosen Jacobian column at a time
-- **downhill simplex** -- derivative-free optimization, no Jacobian needed at all
-- **manipulability** -- analyze the Jacobian itself to relate configuration velocity to the scaling
-  ellipsoid of resulting endeffector velocities (how "equally capable" the arm is in every direction)
-
-</div>
-
----
-layout: default
----
-
-# Interactive: drag a target, watch it converge
-
-<div class="panel text-sm" style="margin-bottom:0.4em">
-
-Drag the magenta sphere anywhere in 3D; the arm converges toward it **live**, solved by
-`runIkIteration` -- the same TS port of `iterateIK` this deck's step-through panel calls, not a
-separately-tuned approximation for the picture. Switch methods and watch the qualitative difference
-this deck's derivations promised: `transpose` is cheap but can wander or oscillate near convergence;
-`pseudoinverse` is the least-squares-optimal direction but can swing wildly approaching a near-singular
-pose; `damped` trades a little accuracy there for staying bounded.
-
-</div>
-
-<div class="content-body">
-<IkConvergePanel robot-name="mr2" />
-</div>
 
 ---
 layout: default
@@ -805,6 +711,7 @@ open it in a new tab, running this module's own `inverse_kinematics.html` (see
 | `urdf_example`, pseudoinverse | <a href="/kineval/inverse_kinematics/reference/inverse_kinematics.html?robot=urdf_example&method=pseudoinverse" target="_blank">?robot=urdf_example&method=pseudoinverse</a> |
 | `mr2`, damped, tight target | <a href="/kineval/inverse_kinematics/reference/inverse_kinematics.html?robot=mr2&method=damped&target_x=0.4&target_y=1.15&target_z=0.45" target="_blank">?robot=mr2&method=damped&target_...</a> |
 | `mr2`, orientation included | <a href="/kineval/inverse_kinematics/reference/inverse_kinematics.html?robot=mr2&orientation=1" target="_blank">?robot=mr2&orientation=1</a> |
+| `fetch`, pseudoinverse (prismatic + revolute) | <a href="/kineval/inverse_kinematics/reference/inverse_kinematics.html?robot=fetch&method=pseudoinverse" target="_blank">?robot=fetch&method=pseudoinverse</a> |
 
 </div>
 </div>
@@ -831,6 +738,11 @@ the math predicts: `|dx|` settles to a small but **persistent nonzero residual**
 zero, because no joint configuration reaches every point in R<sup>3</sup> from a 2-DOF chain. This is
 the opposite failure mode from a singularity (too few independent directions available at all,
 everywhere, not just at one configuration) -- both are visible, honest limits of the method, not bugs.
+
+`fetch` is this deck's one chain with a **prismatic** joint (`torso_lift_joint`) ahead of eight
+revolute ones -- its Jacobian column is just that joint's world axis directly, no cross product
+(a prismatic joint's motion already *is* a translation), exercising the branch
+`computeManipulatorJacobian` added alongside the all-revolute chains above.
 
 </div>
 
@@ -877,47 +789,191 @@ orientation-error term needs stay local to this file instead.
 layout: default
 ---
 
-# Appendix: `quaternion.js`, reused verbatim from forward kinematics
+# Appendix: Jacobian transpose, the full derivation
 
-<div class="panel text-sm">
+<div class="panel text-sm" style="padding:0.6em 0.9em">
 
-Every joint's own variable rotation (folded into `joint.matrix` by `kinematics.js`, itself also
-copied verbatim) still goes through the same axis-angle&rarr;quaternion&rarr;matrix pipeline the
-forward-kinematics deck covers in full; shown here are the two functions this module's own
-orientation-error math leans on directly.
+Define squared endeffector error as a cost in `dq`, take its derivative, evaluate at `dq = 0` (the
+start of each iteration):
 
 </div>
 
-<<< ../reference/quaternion.js#quaternion-multiply {*}{lines:true,startLine:63,maxHeight:'200px'}
-<<< ../reference/quaternion.js#quaternion-to-rotation-matrix {*}{lines:true,startLine:77,maxHeight:'200px'}
+<div class="panel" style="margin-top:0.3em; padding:0.5em 0.9em; font-family:var(--font-mono); font-size:0.74em; line-height:1.6">
+
+C = &Delta;q<sup>T</sup>J<sup>T</sup>J&Delta;q &minus; 2&Delta;q<sup>T</sup>J<sup>T</sup>&Delta;x + &Delta;x<sup>T</sup>&Delta;x &nbsp;&rarr;&nbsp;
+dC/d&Delta;q = 2J<sup>T</sup>J&Delta;q &minus; 2J<sup>T</sup>&Delta;x &nbsp;&rarr;&nbsp;
+dC/d&Delta;q |<sub>&Delta;q=0</sub> = &minus;2J<sup>T</sup>&Delta;x
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.3em; padding:0.5em 0.9em">
+
+To minimize `C`, move opposite the gradient: update by &minus;&gamma; times the derivative above. The
+two minus signs cancel, with the sign flip absorbed into the step length &gamma;:
+
+</div>
+
+<div class="panel" style="margin-top:0.3em; padding:0.4em 0.9em; font-family:var(--font-mono); font-size:0.78em; text-align:center">
+
+&minus;&gamma;(&minus;2J<sup>T</sup>&Delta;x) = <b>&gamma;J<sup>T</sup>&Delta;x</b>
+
+</div>
 
 ---
 layout: default
 ---
 
-# Appendix: `kinematics.js`, reused verbatim from forward kinematics
+# Jacobian pseudoinverse: left form, right form
 
 <div class="panel text-sm">
 
-Every joint's/link's `.matrix` this module reads (`computeManipulatorJacobian`'s `z_i`/`p_i`,
-`iterateIK`'s `p_ee`) is put there by this same `buildFKTransforms` DFS traversal -- the
-forward-kinematics deck covers its full derivation; shown here is just the entry point and the
-per-joint step that produces `.matrix`.
+The lecture's own IK-specific derivation (pp. 88&ndash;91) sets **dC/d&Delta;q = 0** and solves the
+**normal equations** directly: **&Delta;q = (J<sup>T</sup>J)<sup>-1</sup>J<sup>T</sup>&Delta;x** -- the
+**left** (tall) pseudoinverse form. A later, separate "Which Pseudoinverse" slide (pp. 96&ndash;97)
+does state both forms generically for an N&times;M matrix -- but never reconnects that back to say
+*a redundant real robot's Jacobian is usually the wide case*, leaving a gap this slide fills:
 
 </div>
 
-<<< ../reference/kinematics.js#build-fk-transforms {*}{lines:true,startLine:205,maxHeight:'80px'}
-<<< ../reference/kinematics.js#traverse-fk-joint {*}{lines:true,startLine:142,maxHeight:'300px'}
+<div class="split-panel" style="margin-top:0.4em; height:auto; flex:0 0 auto">
+<div>
+
+<div class="panel">
+
+**Left (tall): rows &ge; cols**<br>J<sup>+</sup> = (J<sup>T</sup>J)<sup>-1</sup>J<sup>T</sup><br>fewer joints than task dimensions (overdetermined)
+
+</div>
+</div>
+<div>
+
+<div class="panel">
+
+**Right (wide): rows &lt; cols**<br>J<sup>+</sup> = J<sup>T</sup>(JJ<sup>T</sup>)<sup>-1</sup><br>more joints than task dimensions (redundant, underdetermined)
+
+</div>
+</div>
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+For a wide `J`, **J<sup>T</sup>J** is **singular** (**(J<sup>T</sup>J)<sup>-1</sup>** doesn't exist), so
+the left form breaks down exactly where it matters most: `mr2`'s position-only Jacobian is 3 rows
+(x,y,z) by 4 columns (4 chain joints) -- wide -- so only the right form actually works, matching this
+project's own worksheet finding that **det(J<sup>T</sup>J) &asymp; 0** there. `matrix_pseudoinverse`
+(this deck's own "Code" slide, main flow) branches on exactly `rows >= cols` for exactly this reason.
+
+</div>
 
 ---
 layout: default
 ---
 
-# Appendix: `matrix.js` vector helpers
+# Damped least squares: regularizing near singularities
 
-<<< ../reference/matrix.js#vector-cross {*}{lines:true,startLine:240,maxHeight:'140px'}
-<<< ../reference/matrix.js#vector-normalize {*}{lines:true,startLine:211,maxHeight:'140px'}
-<<< ../reference/matrix.js#vector-subtract {*}{lines:true,startLine:228,maxHeight:'120px'}
+<div class="panel text-sm">
+
+Both forms above divide by something that can be exactly (or nearly) singular. **Damped least
+squares** (Levenberg-Marquardt) adds a regularization term to the normal equations before inverting:
+
+</div>
+
+<div class="panel" style="margin-top:0.4em; font-family:var(--font-mono); font-size:0.85em; text-align:center">
+
+&Delta;q = (J<sup>T</sup>J + &lambda;<sup>2</sup>I)<sup>-1</sup> J<sup>T</sup>&Delta;x
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.4em">
+
+**&lambda;** (`ikParams.damping`) penalizes large joint displacements directly in the cost being
+minimized, so **J<sup>T</sup>J + &lambda;<sup>2</sup>I** stays invertible even when **J<sup>T</sup>J**
+alone is singular or near it -- the diagonal boost keeps every eigenvalue strictly positive. The
+reference implementation adds **&lambda;<sup>2</sup>** directly onto **J<sup>T</sup>J**'s diagonal rather
+than building a separate **&lambda;<sup>2</sup>I** matrix and adding it (`matrix.js` has no
+scalar-multiply/matrix-add helpers, and `generate_identity` is a fixed 4&times;4, sized for
+homogeneous transforms, not this chain's joint count) -- same numeric result, fewer helpers.
+
+</div>
+
+---
+layout: default
+---
+
+# Setpoint sources: clock movement and dance sequence
+
+<<< ../reference/servo_control.js#setpoint-clock-movement {*}{lines:true,startLine:38,maxHeight:'180px'}
+<<< ../reference/servo_control.js#setpoint-dance-sequence {*}{lines:true,startLine:55,maxHeight:'260px'}
+
+---
+layout: default
+---
+
+# Beyond this lab: optimization considerations
+
+<div class="panel text-sm">
+
+The lecture closes its Jacobian section with a survey of refinements this module doesn't implement,
+worth knowing exist:
+
+</div>
+
+<div class="panel">
+
+- **joint limits, multiple endeffectors, preferred poses** -- additional constraints beyond "reach
+  the target"
+- **null-space optimization** -- apply constraints hierarchically, using any slack a redundant chain
+  leaves after satisfying the primary one
+- **resolved rate** -- hold endeffector velocity at constant magnitude (Whitney's original framing)
+- **stochastic gradient descent** -- update from one randomly chosen Jacobian column at a time
+- **downhill simplex** -- derivative-free optimization, no Jacobian needed at all
+- **manipulability** -- analyze the Jacobian itself to relate configuration velocity to the scaling
+  ellipsoid of resulting endeffector velocities (how "equally capable" the arm is in every direction)
+
+</div>
+
+---
+layout: default
+---
+
+# Appendix: dependencies on the forward-kinematics module
+
+<div class="panel text-sm" style="padding:0.5em 0.9em">
+
+This module reuses several forward-kinematics-module functions **unmodified**. None of them are
+re-derived here -- see the forward-kinematics deck's own slides for their full derivation and code
+walkthrough:
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.3em; padding:0.5em 0.9em">
+
+- **`kinematics.js`**'s `buildFKTransforms` DFS traversal -- every joint's/link's `.matrix` this
+  module reads (`computeManipulatorJacobian`'s `z_i`/`p_i`, `iterateIK`'s `p_ee`) is put there by it
+- **`quaternion.js`**'s axis-angle&rarr;quaternion&rarr;matrix rotation math -- every joint's own
+  variable rotation still goes through this pipeline
+- **`matrix.js`**'s generic linear-algebra helpers: `matrix_copy`, `matrix_transpose`,
+  `matrix_square_invert`, `generate_identity`, `generate_translation_matrix`, `matrix_invert_affine`,
+  `generate_rotation_matrix_{X,Y,Z}`, `vector_cross`, `vector_normalize`
+
+</div>
+
+<div class="panel text-sm" style="margin-top:0.3em; padding:0.5em 0.9em">
+
+Full derivation and code walkthrough for all of the above:
+<a href="https://ocj-dev.github.io/kineval/forward_kinematics/" target="_blank">ocj-dev.github.io/kineval/forward_kinematics/</a>.
+`matrix_pseudoinverse` (this deck's own "Code" slide, main flow) is **not** on this list -- it's
+substantively IK content, not forward-kinematics material, even though it lives in the same
+`matrix.js` file.
+
+</div>
+
+---
+layout: default
+---
+
+# Appendix: `matrix.js` -- what's new here
+
+<<< ../reference/matrix.js#vector-subtract {*}{lines:true,startLine:228,maxHeight:'160px'}
 
 <div class="panel text-sm" style="margin-top:0.4em">
 
@@ -926,36 +982,6 @@ plain elementwise subtraction, added for `computeManipulatorJacobian`'s `p_ee - 
 `target - current` error term, in the same style as every other `vector_*` helper here.
 
 </div>
-
----
-layout: default
----
-
-# Appendix: `matrix.js` core utilities
-
-<<< ../reference/matrix.js#matrix-copy {*}{lines:true,startLine:44,maxHeight:'140px'}
-<<< ../reference/matrix.js#matrix-transpose {*}{lines:true,startLine:78,maxHeight:'140px'}
-<<< ../reference/matrix.js#matrix-square-invert {*}{lines:true,startLine:93,maxHeight:'260px'}
-
----
-layout: default
----
-
-# Appendix: the rest of the `matrix.js` STENCIL
-
-<<< ../reference/matrix.js#generate-identity {*}{lines:true,startLine:251,maxHeight:'100px'}
-<<< ../reference/matrix.js#generate-translation-matrix {*}{lines:true,startLine:263,maxHeight:'120px'}
-<<< ../reference/matrix.js#matrix-invert-affine {*}{lines:true,startLine:177,maxHeight:'220px'}
-
----
-layout: default
----
-
-# Appendix: `generate_rotation_matrix_{X,Y,Z}`
-
-<<< ../reference/matrix.js#generate-rotation-matrix-x {*}{lines:true,startLine:275,maxHeight:'140px'}
-<<< ../reference/matrix.js#generate-rotation-matrix-y {*}{lines:true,startLine:288,maxHeight:'140px'}
-<<< ../reference/matrix.js#generate-rotation-matrix-z {*}{lines:true,startLine:301,maxHeight:'140px'}
 
 ---
 layout: default
@@ -996,7 +1022,9 @@ layout: default
 
 The chain tables (`CHAIN_JOINT_NAMES`) are the authoritative source this deck's own `robots.ts` port
 mirrors by hand -- the same ancestor-only exclusion logic this deck's Jacobian slides walk through for
-`urdf_example`'s `joint1` and `mr2`'s `clavicle_left_roll`.
+`urdf_example`'s `joint1` and `mr2`'s `clavicle_left_roll`. `fetch`'s own entry is the longest chain
+here -- nine joints, `torso_lift_joint` through `gripper_axis` -- and the only one mixing a prismatic
+joint in among revolute ones.
 
 </div>
 
@@ -1025,13 +1053,17 @@ in real time instead of tying it to render speed.
 layout: default
 ---
 
-# Appendix: robot descriptions -- `urdf_example`, `mobile_arm`, `mr2`
+# Appendix: robot descriptions -- `urdf_example`, `mobile_arm`, `mr2`, `fetch`
 
 <div class="panel text-sm">
 
 `urdf_example` and `mobile_arm` are ported straight from the forward-kinematics module's own robot
 files (same geometry-as-plain-data convention); `robot_mr2.js` is upstream's own right-arm-only
 humanoid stencil exercise, ported with its left arm deliberately left incomplete, same as upstream.
+`robots/robot_fetch.js` (not shown in full here, same plain-data convention) ports upstream's Fetch
+arm verbatim down to joint types/origins/axes, with placeholder box geometry per link since this
+buildless reference has no runtime skeleton synthesis from meshes the way the full `kineval/` viewer
+does.
 
 </div>
 

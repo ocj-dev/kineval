@@ -64,7 +64,8 @@ function readIKParams() {
 var ROBOT_FACTORIES = {
     mobile_arm: { create: createMobileArmRobot, needsThree: false },
     urdf_example: { create: createUrdfExampleRobot, needsThree: false },
-    mr2: { create: createRobotMr2, needsThree: true }
+    mr2: { create: createRobotMr2, needsThree: true },
+    fetch: { create: createRobotFetch, needsThree: false }
 };
 
 // The ordered base-to-end-effector chain of ACTUAL ANCESTOR joints driving
@@ -77,10 +78,30 @@ var ROBOT_FACTORIES = {
 // branch off `base` (mr2's left arm, left deliberately unfinished by
 // upstream's own stencil) with zero effect on this end-effector, and is
 // excluded for the same reason joint1 is.
+// fetch's chain is this table's only one with a PRISMATIC joint
+// (torso_lift_joint) -- see ../inverse_kinematics.js#manipulator-jacobian's
+// prismatic branch, which exists specifically to drive this column. It also
+// ends in gripper_axis, a `fixed`-type joint: walking base-to-end-effector
+// via each joint's actual ancestor chain (robot_fetch.js: gripper_axis's
+// parent link is wrist_roll_link, whose parent joint is wrist_roll_joint,
+// ... up to torso_lift_joint's parent link base_link, the robot's base)
+// necessarily ends AT the end-effector's own joint, same as urdf_example's
+// chain ending in joint3 and mr2's ending in forearm_right_yaw above --
+// gripper_axis is no different, it's just `fixed` rather than revolute.
+// computeManipulatorJacobian has no `fixed`-type special case (only
+// `prismatic` branches differently from everything else), so gripper_axis's
+// own column runs through the revolute-shaped branch same as any other
+// non-prismatic joint -- harmlessly: robot.endeffector.position sits 0.1m
+// out along gripper_axis's own local +x, which is also gripper_axis's own
+// rotation axis, so p_ee - p_gripper_axis is parallel to gripper_axis's
+// world axis and that column's cross product comes out the zero vector
+// (see robot_fetch.js's own header for this same point).
 var CHAIN_JOINT_NAMES = {
     mobile_arm: ['joint_pitch', 'joint1', 'joint2'],
     urdf_example: ['joint2', 'joint3'],
-    mr2: ['clavicle_right_yaw', 'shoulder_right_yaw', 'upperarm_right_pitch', 'forearm_right_yaw']
+    mr2: ['clavicle_right_yaw', 'shoulder_right_yaw', 'upperarm_right_pitch', 'forearm_right_yaw'],
+    fetch: ['torso_lift_joint', 'shoulder_pan_joint', 'shoulder_lift_joint', 'upperarm_roll_joint',
+        'elbow_flex_joint', 'forearm_roll_joint', 'wrist_flex_joint', 'wrist_roll_joint', 'gripper_axis']
 };
 
 // A non-singular starting pose per robot (every joint at angle 0 is a valid
@@ -89,7 +110,11 @@ var CHAIN_JOINT_NAMES = {
 var INITIAL_ANGLES = {
     mobile_arm: { joint_pitch: 0.3, joint1: 0.5, joint2: -0.4 },
     urdf_example: { joint2: 0.3, joint3: -0.5 },
-    mr2: { clavicle_right_yaw: 0.2, shoulder_right_yaw: 0.3, upperarm_right_pitch: 0.4, forearm_right_yaw: -0.3 }
+    mr2: { clavicle_right_yaw: 0.2, shoulder_right_yaw: 0.3, upperarm_right_pitch: 0.4, forearm_right_yaw: -0.3 },
+    fetch: {
+        torso_lift_joint: 0.1, shoulder_pan_joint: 0.3, shoulder_lift_joint: 0.3, upperarm_roll_joint: 0.2,
+        elbow_flex_joint: 0.6, forearm_roll_joint: 0, wrist_flex_joint: 0.3, wrist_roll_joint: 0
+    }
 };
 
 // A reachable-ish default IK target per robot, overridden per-axis by
@@ -115,7 +140,13 @@ var DEFAULT_TARGETS = {
     // z != 0 would be permanently unreachable, not just far away.
     mobile_arm: [0.4, 0.55, 0],
     urdf_example: [0.7, 0.75, 0.25],
-    mr2: [0.4, 1.15, 0.45]
+    mr2: [0.4, 1.15, 0.45],
+    // fetch's gripper (chain's INITIAL_ANGLES pose) sits at roughly
+    // [0.85, 0.30, 0.23]; fully extended (every joint at 0) it reaches
+    // roughly [1.23, 0, 0.79] -- this target is comfortably inside that,
+    // reachable by all three methods without nearing the straight-arm
+    // singularity.
+    fetch: [0.75, 0.2, 0.6]
 };
 
 function resolveRobotName(params) {

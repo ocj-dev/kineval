@@ -71,6 +71,7 @@
 <script src="robots/mobile_arm.urdf.js"></script>
 <script src="robots/urdf_example.js"></script>
 <script src="robots/robot_mr2.js"></script>
+<script src="robots/robot_fetch.js"></script>
 <script src="infrastructure.js"></script>
 
 <script type="module">
@@ -135,6 +136,11 @@ app.endeffectorMarker = createEndeffectorMarker(viewer);
 
 app.reset();
 syncPlayButtonLabel(hud, app);
+
+// Exposed on window purely for console/test inspection (module-scoped `var
+// app` isn't reachable from outside this module script otherwise) -- same
+// spirit as inverse_kinematics.js's own [NOTICE] on robot.dx/jacobian/dq.
+window.app = app;
 
 createAnimationLoop(app, function (due) {
     if (due) {
