@@ -29,6 +29,7 @@ jobs:
             cloth_simulation/slides/package-lock.json
             simulation/slides/package-lock.json
             forward_kinematics/slides/package-lock.json
+            inverse_kinematics/slides/package-lock.json
 
       - name: Build the pathfinding Slidev deck
         working-directory: pathfinding/slides
@@ -54,6 +55,12 @@ jobs:
           npm install
           npm run build
 
+      - name: Build the inverse_kinematics Slidev deck
+        working-directory: inverse_kinematics/slides
+        run: |
+          npm install
+          npm run build
+
       - name: Assemble the site
         run: |
           mkdir -p site
@@ -62,7 +69,8 @@ jobs:
           cp -r cloth_simulation/slides/dist site/cloth_simulation
           cp -r simulation/slides/dist site/simulation
           cp -r forward_kinematics/slides/dist site/forward_kinematics
-          cp -r inverse_kinematics motion_planning kineval site/
+          cp -r inverse_kinematics/slides/dist site/inverse_kinematics
+          cp -r motion_planning kineval site/
           # the 2D path-planning reference implementation is a plain,
           # dependency-free static app (no build step) -- serve it directly
           # at kineval/pathplanning/, alongside (not instead of) the
@@ -85,6 +93,10 @@ jobs:
           mkdir -p site/forward_kinematics/reference
           cp -r forward_kinematics/reference/. site/forward_kinematics/reference/
           cp site/forward_kinematics/reference/forward_kinematics.html site/forward_kinematics/reference/index.html
+          # same idea again for the inverse-kinematics reference implementation
+          mkdir -p site/inverse_kinematics/reference
+          cp -r inverse_kinematics/reference/. site/inverse_kinematics/reference/
+          cp site/inverse_kinematics/reference/inverse_kinematics.html site/inverse_kinematics/reference/index.html
           # GitHub Pages only ever consults a 404.html at the site root, and
           # each Slidev deck is its own separately-built SPA with its own JS
           # bundle -- one deck's 404.html can't correctly bootstrap another
@@ -99,7 +111,7 @@ jobs:
           <body>
           <script>
             var path = window.location.pathname;
-            var decks = ['pathfinding', 'cloth_simulation', 'simulation', 'forward_kinematics'];
+            var decks = ['pathfinding', 'cloth_simulation', 'simulation', 'forward_kinematics', 'inverse_kinematics'];
             var target = '/kineval/';
             for (var i = 0; i < decks.length; i++) {
               if (path.indexOf('/kineval/' + decks[i] + '/') === 0) {

@@ -78,6 +78,10 @@
 <script src="quaternion.js"></script>
 <script src="kinematics.js"></script>
 
+<!-- inverse kinematics + servo/setpoint control (this viewer's own reference implementations) -->
+<script src="inverse_kinematics.js"></script>
+<script src="servo_control.js"></script>
+
 <!-- ported upstream test robots (robots/robot_urdf_example.js, robot_mr2.js, robot_crawler.js) -->
 <script src="robots/robot_urdf_example.js"></script>
 <script src="robots/robot_mr2.js"></script>
@@ -110,7 +114,23 @@ var container = document.getElementById('scene-container');
 var viewer = createViewer(container);
 var keyboard = createKeyboardState();
 
-var app = { robot: null, links_geom: null, rig: null, params: { active_link: null, active_joint: null } };
+var app = {
+    robot: null, links_geom: null, rig: null,
+    params: {
+        active_link: null, active_joint: null,
+        // IK target in world coordinates, seeded within mr2's right-hand
+        // reachable workspace (see inverse_kinematics.js); r/f move its Y
+        // up/down, p iterates IK toward it
+        ik_target: { xyz: [0.5, 1.3, 1.8], orientation: [0, 0, 0] },
+        update_ik: false, persist_ik: false,
+        ik_method: 'transpose', ik_steplength: 0.3,
+        // servo/setpoint control state (servo_control.js)
+        setpoint_target: {},
+        update_pd: false, persist_pd: false,
+        update_pd_clock: false, update_pd_dance: false
+    }
+};
+window.app = app; // exposed for console/debugging inspection, same spirit as the inline HUD
 
 function loadRobot(name) {
     if (app.robot) removeRobotMeshes(viewer, app.robot, app.rig);
@@ -122,6 +142,13 @@ function loadRobot(name) {
 
     app.params.active_link = app.robot.base;
     app.params.active_joint = app.robot.links[app.robot.base].children[0];
+
+    // setpoint targets are joint-name keyed, so they don't carry over
+    // meaningfully across a robot switch; the IK target (a world-frame
+    // point) can stay put, and deriveArmChain re-derives a fresh
+    // robot.ik_chain for the newly loaded robot on its first IK iteration
+    app.params.setpoint_target = {};
+    app.params.dance_poses = null;
 
     app.rig = buildRobotMeshes(viewer, app.robot, app.links_geom);
     robotForwardKinematics(app.robot);
@@ -173,12 +200,23 @@ window.addEventListener('keydown', function (e) {
 
 function renderHudStatus() {
     var r = app.robot;
+    var eeFrame = r.joints[r.endeffector.frame];
+    var eeWorld = matrix_multiply(eeFrame.xform, r.endeffector.position);
+    var target = app.params.ik_target.xyz;
+    var errDist = Math.sqrt(
+        Math.pow(target[0] - eeWorld[0][0], 2) +
+        Math.pow(target[1] - eeWorld[1][0], 2) +
+        Math.pow(target[2] - eeWorld[2][0], 2)
+    );
+
     status.textContent =
         'Full KinEval Reference Viewer\n' +
         'robot = ' + r.name + '   active joint = ' + app.params.active_joint + '\n' +
         'base xyz = [' + r.origin.xyz.map(function (v) { return v.toFixed(2); }).join(', ') + ']' +
         '   rpy = [' + r.origin.rpy.map(function (v) { return v.toFixed(2); }).join(', ') + ']\n' +
-        'joint angle = ' + r.joints[app.params.active_joint].angle.toFixed(3);
+        'joint angle = ' + r.joints[app.params.active_joint].angle.toFixed(3) + '\n' +
+        'ik target = [' + target.map(function (v) { return v.toFixed(2); }).join(', ') + ']' +
+        '   endeffector error = ' + errDist.toFixed(3);
 }
 
 function frame() {
@@ -188,6 +226,10 @@ function frame() {
     robotForwardKinematics(app.robot);
     updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
     renderHudStatus();
+    setpointClockMovement(app.robot, app.params);
+    setpointDanceSequence(app.robot, app.params);
+    robotArmControllerSetpoint(app.robot, app.params);
+    robotInverseKinematics(app.robot, app.params);
     viewer.controls.update();
     viewer.renderer.render(viewer.scene, viewer.camera);
 }

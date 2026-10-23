@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<!--|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    Inverse Kinematics
+
+    COMPLETED REFERENCE IMPLEMENTATION for the AutoRob (autorob.org) lab-session
+    slides. A completed, from-scratch reference implementation of the upstream
+    kineval-stencil (github.com/autorob/kineval-stencil) inverse-kinematics and
+    servo-control modules: Jacobian-transpose/pseudoinverse/damped-least-squares
+    IK iteration, rendered as an orbit-able three.js scene whose arm converges
+    toward a user-movable target. Runs standalone, no build step -- every run
+    is configured through URL parameters (see infrastructure.js#appendix-url-params).
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inverse Kinematics | KinEval</title>
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  #scene-container { position: absolute; inset: 0; }
+  #scene-container canvas { display: block; }
+  .ik-hud {
+    position: absolute; top: 12px; left: 12px; max-width: 30em;
+    background: #ffffffee; border: 1px solid #d7d9dd; border-radius: 10px;
+    box-shadow: 0 1px 3px #00000026; padding: 0.7em 0.9em;
+  }
+  .ik-status { margin: 0 0 0.6em; font-family: 'Roboto Mono', monospace; font-size: 0.76em; line-height: 1.45; white-space: pre-wrap; }
+  .ik-controls { display: flex; flex-wrap: wrap; gap: 0.4em; align-items: center; margin-bottom: 0.5em; }
+  .ik-controls button, .ik-controls select {
+    font: inherit; font-size: 0.85em; padding: 0.3em 0.7em; border-radius: 6px; border: 1px solid #c7cad1; background: #fff; cursor: pointer;
+  }
+  .ik-field { display: flex; align-items: center; gap: 0.3em; font-size: 0.8em; font-family: 'Roboto Mono', monospace; }
+  .ik-field input[type="number"] { width: 4.2em; font: inherit; }
+  .ik-hint { font-size: 0.72em; color: #5f6368; margin-top: 0.2em; }
+</style>
+
+<!-- import map: OrbitControls.js (and the mesh-format loaders) import "three" as a bare specifier -->
+<script type="importmap">
+{
+  "imports": { "three": "./vendor/three/three.module.js" }
+}
+</script>
+</head>
+<body>
+
+<div id="scene-container"></div>
+
+<!-- functions completing every STENCIL section of the upstream modules -->
+<script src="matrix.js"></script>
+<script src="quaternion.js"></script>
+<script src="kinematics.js"></script>
+<script src="inverse_kinematics.js"></script>
+<script src="servo_control.js"></script>
+<script src="robots/mobile_arm.urdf.js"></script>
+<script src="robots/urdf_example.js"></script>
+<script src="robots/robot_mr2.js"></script>
+<script src="infrastructure.js"></script>
+
+<script type="module">
+import {
+    createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, resizeRenderer,
+    instantiateThreeRobot, createTargetMarker, updateTargetMarker, createEndeffectorMarker, updateEndeffectorMarker
+} from './scene.js';
+
+var container = document.getElementById('scene-container');
+var viewer = createViewer(container);
+
+var app = {
+    params: readIKParams(),
+    robot: null,
+    linksGeom: null,
+    endeffectorJoint: null,
+    endeffectorPositionLocal: null,
+    target: { position: [0, 0, 0], orientation: null },
+    ikParams: null,
+    isRunning: false,
+    stepOnce: false,
+    iterationCount: 0,
+    targetMarker: null,
+    endeffectorMarker: null
+};
+
+app.ikParams = {
+    method: app.params.method,
+    steplength: app.params.steplength,
+    damping: app.params.damping,
+    orientationIncluded: app.params.orientation,
+    chainJointNames: null
+};
+
+app.reset = function () {
+    if (app.robot) removeRobotMeshes(viewer);
+
+    var built = createRobotFromParams(app.params, function (factoryFn) { return instantiateThreeRobot(factoryFn); });
+    app.robot = built.robot;
+    app.linksGeom = built.linksGeom;
+    app.ikParams.chainJointNames = built.chainJointNames;
+
+    app.endeffectorJoint = app.robot.joints[app.robot.endeffector.frame];
+    app.endeffectorPositionLocal = app.robot.endeffector.position;
+
+    app.target.position = targetPositionFromParams(app.params);
+    app.target.orientation = app.params.orientation ? defaultTargetOrientation() : null;
+
+    buildFKTransforms(app.robot);           // establish every joint's/link's .matrix before first render
+    buildRobotMeshes(viewer, app.robot, app.linksGeom);
+    updateRobotMeshes(viewer, app.robot);
+
+    app.iterationCount = 0;
+    app.isRunning = app.params.autoplay;
+};
+
+var hud = buildHud(container, app);
+initTargetKeyControl(app, hud);
+
+app.targetMarker = createTargetMarker(viewer);
+app.endeffectorMarker = createEndeffectorMarker(viewer);
+
+app.reset();
+syncPlayButtonLabel(hud, app);
+
+createAnimationLoop(app, function (due) {
+    if (due) {
+        robotInverseKinematics(app.robot, app.target, app.endeffectorJoint, app.endeffectorPositionLocal, app.ikParams, true);
+        applyControls(app.robot);
+        buildFKTransforms(app.robot);
+        app.iterationCount++;
+    }
+
+    updateRobotMeshes(viewer, app.robot);
+    updateTargetMarker(app.targetMarker, app.target.position);
+
+    var eeHom = matrix_multiply(app.endeffectorJoint.matrix, app.endeffectorPositionLocal);
+    updateEndeffectorMarker(app.endeffectorMarker, [eeHom[0][0], eeHom[1][0], eeHom[2][0]]);
+
+    renderHudStatus(hud.status, app);
+    viewer.controls.update();
+    viewer.renderer.render(viewer.scene, viewer.camera);
+});
+
+window.addEventListener('resize', function () { resizeRenderer(viewer, container); });
+</script>
+
+</body>
+</html>

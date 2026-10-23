@@ -11,10 +11,27 @@ key bindings (`w/s/a/d/q/e` base motion, `j/k/l/h` active-joint navigation, `u/i
 
 Live at `https://ocj-dev.github.io/kineval/kineval/`.
 
-Everything this page needs beyond `forward_kinematics/` — inverse kinematics, RRT-Connect motion
-planning, collision detection, PID/dynamics setpoint control — isn't built yet (see `../README.md`
-for the overall build order); those controls (`p`, `m`/`n`/`b`, `o`/`c`, `0`-`9`, `r`/`f` in
-upstream's own scheme) will be added back in as each of those modules lands.
+Jacobian-based inverse kinematics and P-servo/clock setpoint control are now built
+(`inverse_kinematics.js`, `servo_control.js`), matching upstream's own key scheme:
+
+- `p` — one-shot: iterate inverse kinematics one step toward `params.ik_target` (the manipulator
+  Jacobian transpose or pseudoinverse times the position error, applied through `.control` like
+  every other input in this viewer)
+- `r`/`f` — held: move the IK target up/down along world Y
+- `o` — held: run the P-servo controller toward `params.setpoint_target`
+- `c` — held: derive `params.setpoint_target` from the wall clock, then P-servo toward it
+
+The IK Jacobian is built over the end-effector's **arm chain**, derived generically by walking
+`.parent` links/joints from `robot.endeffector.frame` back to `robot.base` (not hardcoded per
+robot) — see `inverse_kinematics.js#deriveArmChain`. All six ported robots carry a
+`robot.endeffector = {frame, position}` field, so all six have a usable arm chain; for mr2 this
+correctly derives `['clavicle_right_yaw','shoulder_right_yaw','upperarm_right_pitch',
+'forearm_right_yaw']`, excluding `clavicle_left_roll` (a disconnected sibling branch off the base
+link that the backward walk never visits).
+
+Still not built yet (see `../README.md` for the overall build order): RRT-Connect motion planning
+and collision detection — those controls (`m`/`n`/`b`, `0`-`9` pose-setpoint slots in upstream's
+own scheme) will be added back in as those modules land.
 
 ## Test robots
 

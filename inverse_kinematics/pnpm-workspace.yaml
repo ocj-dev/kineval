@@ -1,0 +1,9 @@
+# Not used for actual dependency management (a future slides/ deck would
+# install via plain npm) -- this file exists solely so Vite/Slidev tooling
+# that walks up to find a "workspace root" (Slidev's own <<< snippet
+# importer, and Vite's default dev-server fs.allow) stops here, letting a
+# slides/slides.md and slides/components/*.vue reach into ../reference/*
+# directly -- same reason forward_kinematics/pnpm-workspace.yaml,
+# simulation/pnpm-workspace.yaml, and pathfinding/pnpm-workspace.yaml exist.
+packages:
+  - 'slides'

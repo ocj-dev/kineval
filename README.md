@@ -23,9 +23,9 @@ reference code lives alongside its deck at `<topic>/reference/`.
 | 2D cloth simulation | [`cloth_simulation/`](cloth_simulation/) | Built |
 | Pendularm dynamical simulation | [`simulation/`](simulation/) | Built |
 | Forward kinematics & quaternions | [`forward_kinematics/`](forward_kinematics/) | Built |
-| Inverse kinematics & optimization | [`inverse_kinematics/`](inverse_kinematics/) | Planned |
+| Inverse kinematics & optimization | [`inverse_kinematics/`](inverse_kinematics/) | Built |
 | RRT-Connect motion planning | [`motion_planning/`](motion_planning/) | Planned |
-| Full working KinEval viewer | [`kineval/`](kineval/) | Forward kinematics only so far (depends on the topics above) |
+| Full working KinEval viewer | [`kineval/`](kineval/) | Forward + inverse kinematics (depends on the topics above) |
 
 ## License
 

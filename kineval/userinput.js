@@ -11,11 +11,16 @@
     base translation/turning (w/s/a/d/q/e), and camera zoom (z/x) -- every
     one of these ported with upstream's own key bindings, increment sizes,
     and (for w/s/q/e) its exact robot_heading/robot_lateral-based motion
-    formula, unchanged. Out of scope: everything upstream's handleUserInput
-    drives that isn't forward kinematics -- PID setpoints (o/c/0-9), inverse
-    kinematics (p/r/f), motion planning (m/n/b) -- since none of those
-    modules are built in this project yet (see ../README.md's build-order
-    table).
+    formula, unchanged.
+
+    Also now wired up, matching upstream's own key scheme exactly: `p`
+    (one-shot, iterate inverse kinematics -- see inverse_kinematics.js),
+    `r`/`f` (held, move the IK target up/down along world Y by upstream's
+    own +-0.01 increment), and `o`/`c` (held, trigger the P-servo-to-
+    setpoint and clock-driven setpoint controllers -- see servo_control.js).
+    Still out of scope: motion planning (m/n/b) and pose-setpoint slots
+    (0-9), since that module isn't built in this project yet (see
+    ../README.md's build-order table).
 
     Uses a minimal inline held-keys Set, the same "one dependency fewer"
     replacement for the upstream stencil's vendored THREEx.KeyboardState
@@ -111,6 +116,27 @@ function handleUserInput(robot, params, keyboard, camera) {
         robot.control.xyz[2] += -0.1 * (robot.lateral[2][0] - robot.origin.xyz[2]);
         robot.control.xyz[0] += -0.1 * (robot.lateral[0][0] - robot.origin.xyz[0]);
     }
+
+    // move the IK target up/down along world Y, matching upstream's own
+    // kineval.params.ik_target.position[1][0] +-0.01 held-key increment
+    // (same xyz axis order as robot.origin.xyz/robot.control.xyz elsewhere
+    // in this file -- index 1 is world Y, "up")
+    if (keyboard.pressed('r')) params.ik_target.xyz[1] += 0.01;
+    if (keyboard.pressed('f')) params.ik_target.xyz[1] -= 0.01;
+
+    // execute P-servo-to-setpoint controller (servo_control.js), matching
+    // upstream's own o/c held-key scheme: 'o' drives toward whatever is
+    // currently in params.setpoint_target, 'c' additionally re-derives that
+    // setpoint from the clock every frame first (setpointClockMovement)
+    if (keyboard.pressed('o')) {
+        params.update_pd = true;
+        params.update_pd_clock = false;
+        params.update_pd_dance = false;
+    }
+    if (keyboard.pressed('c')) {
+        params.update_pd = true;
+        params.update_pd_clock = true;
+    }
 }
 
 // one-shot (keydown, not held) bindings for discrete active-joint navigation
@@ -121,6 +147,9 @@ function initKeyEvents(robot, params) {
             case 'k': changeActiveLinkUp(robot, params); break;
             case 'l': changeActiveLinkSibling(robot, params, 1); break;
             case 'h': changeActiveLinkSibling(robot, params, -1); break;
+            // one-shot IK iteration request, consumed and cleared by
+            // robotInverseKinematics (inverse_kinematics.js) on the next frame
+            case 'p': params.update_ik = true; break;
         }
     });
 }
@@ -133,4 +162,8 @@ var HELP_TEXT =
     '<br>w/s a/d q/e : move base forward/turn/strafe' +
     '<br>j/k/l/h : focus active joint to child/parent/next-sibling/previous-sibling' +
     '<br>u/i : rotate active joint' +
+    '<br>p : iterate inverse kinematics motion toward IK target' +
+    '<br>r/f : move inverse kinematics target up/down' +
+    '<br>o : control robot arm to current setpoint target' +
+    '<br>c : execute clock-driven setpoint controller' +
     '<br>v : show this help';
