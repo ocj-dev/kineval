@@ -28,7 +28,7 @@ fonts:
 
 <div class="title-footer">
 <div class="nav-hint">Press → to move forward through the deck</div>
-<div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding</div>
+<div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding &#183; Michigan Honor License &#183; 2026</div>
 </div>
 
 <!--
@@ -574,7 +574,7 @@ class: text-center
 </div>
 <div class="image-credit mt-2">Ford Fusion Next Generation Vehicle &#183; <a href="https://robots.engin.umich.edu/Projects/NGV">robots.engin.umich.edu/Projects/NGV</a></div>
 <div class="image-caption">Go Blue!</div>
-<div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding</div>
+<div class="credit">AutoRob (autorob.org) &#183; Chad Jenkins (ocj@umich.edu) &#183; ocj-dev.github.io/kineval/pathfinding &#183; Michigan Honor License &#183; 2026</div>
 
 ---
 layout: default
