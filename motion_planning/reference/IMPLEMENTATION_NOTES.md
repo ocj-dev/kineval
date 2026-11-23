@@ -177,3 +177,72 @@ the same reason, and those **have already drifted** from `kineval/`. That
 is the cost of a per-module `reference/` convention in a repository with
 no build step. A `diff` is the cheap check, and the verification harness
 runs it for this module's copies.
+
+---
+
+## The deck, and what shipping it verified
+
+`motion_planning/slides/` was built after this reference implementation,
+on 2026-11-23. Recorded here because the deck's plan requires three
+passes to be written down rather than merely performed.
+
+### Code-coverage pass — 73/73, no exemptions
+
+Every `#region` defined in `reference/{rrt,collision,motion_plan,random,
+infrastructure,graph_search,draw}.js` is quoted by a `<<<` in
+`slides.md`.
+
+The first run reported 68/68 and was **wrong**: the checking regex was
+`^// #region`, and five regions in the carried `graph_search.js` are
+**indented**, as is `draw.js#appendix-animate`'s closing marker. With
+`^[ \t]*// #(end)region` the real total is 73. Those five A\* regions are
+taught in full by the pathfinding deck, and are reproduced in an appendix
+here anyway so the pass needs no exemption.
+
+### Snapshot-freshness pass — clean at ship time
+
+`diff` of `reference/collision.js` and `reference/motion_plan.js` against
+their `kineval/` sources (ignoring the provenance header), and a
+byte-for-byte `diff` of `random.js`. All three identical at the shipping
+commit.
+
+### Live-URL verification — all four, in a real browser
+
+Loaded from `https://ocj-dev.github.io/kineval` after the deploy, not
+inferred from the workflow's green tick:
+
+| URL | Result |
+|---|---|
+| `/motion_planning/` | the built deck — 75 slides, 10 canvases, clean console. **Not the stub.** |
+| `/motion_planning/reference/` | the 2D canvas, running RRT-Connect on `scenes/spiral.js` |
+| `/kineval/?world=local_minima` | the viewer: crawler, 30 DOF, 14 worlds, `base` highlighted against obstacle 0 |
+| `/motion_planning/99` | client-side routed to `/kineval/motion_planning/1` |
+
+The stub check is the one that matters. `deploy.yml`'s
+`cp -r motion_planning kineval site/` ran *after* the per-module dist
+copies, so adding a dist copy without splitting that line would have
+merged the old "coming soon" stub straight over the built deck **while
+the workflow still went green**. It was caught before pushing by
+extracting the workflow's own Assemble block and running it against a
+temporary directory — the same check the live URL gives, minutes earlier.
+
+### A deck figure that contradicted its own caption
+
+The A\*-versus-RRT-Connect panel reports, on `spiral`, A\* at path length
+**9.70** and RRT-Connect at **9.57**. The slide beside it originally said
+the sampling planner's path is "visibly not the shortest one". It is
+shorter.
+
+Both facts are correct and the slide was wrong: A\* is optimal **on its
+grid**, and that grid is four-connected, so it pays a Manhattan penalty a
+continuous-space path never incurs. The slide now says so, which is a
+better point than the one it replaced. Found by reading the rendered
+panel, not by reading the code.
+
+### Known cosmetic, not a defect
+
+The title slide's emoji renders as a tofu box in this container's
+headless Chromium, which has no emoji font. The already-shipped
+`pathfinding/` deck does the same thing with its own title-slide emoji,
+so this is a property of the capture environment rather than of either
+deck.
