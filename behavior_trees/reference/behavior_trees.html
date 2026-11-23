@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<!--|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    Behavior Trees
+
+    COMPLETED REFERENCE IMPLEMENTATION for the AutoRob (autorob.org)
+    lab-session slides: a behavior-tree tick engine, a motion plan
+    expressed as a JointTrajectory, a joint-trajectory action that
+    executes it under servo control, and trees that sequence the result
+    for tasks longer than one motion.
+
+    The motion plan is not planned here. It was planned by the KinEval
+    RRT-Connect planner (../../kineval/motion_plan.js, the one the
+    motion_planning module teaches) and committed to
+    plans/mr2_arm_workspace.json, which records the seed, the world, the
+    iteration count and both the raw and smoothed paths.
+
+    Runs standalone, no build step. Every run is configured through URL
+    parameters -- see infrastructure.js#bt-params.
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Behavior Trees | KinEval</title>
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  #scene-container { position: absolute; inset: 0; }
+  #scene-container canvas { display: block; }
+  .bt-hud {
+    position: absolute; top: 12px; right: 12px; max-width: 34em; max-height: calc(100% - 24px);
+    overflow: auto;
+    background: #ffffffee; border: 1px solid #d7d9dd; border-radius: 10px;
+    box-shadow: 0 1px 3px #00000026; padding: 0.7em 0.9em;
+  }
+  .bt-controls { display: flex; flex-wrap: wrap; gap: 0.4em; align-items: center; margin-bottom: 0.6em; }
+  .bt-controls button, .bt-controls select {
+    font: inherit; font-size: 0.85em; padding: 0.3em 0.7em; border-radius: 6px;
+    border: 1px solid #c7cad1; background: #fff; cursor: pointer;
+  }
+  .bt-field { display: flex; align-items: center; gap: 0.25em; font-size: 0.78em; }
+  .bt-status, .bt-tree, .bt-log {
+    margin: 0 0 0.6em; font-family: 'Roboto Mono', ui-monospace, monospace;
+    font-size: 0.72em; line-height: 1.45; white-space: pre-wrap;
+  }
+  .bt-tree { border-top: 1px solid #e4e6ea; border-bottom: 1px solid #e4e6ea; padding: 0.5em 0; }
+  .bt-log { color: #5f6368; }
+  .bt-error { color: #c0392b; font-size: 0.8em; font-family: 'Roboto Mono', monospace; }
+</style>
+
+<!-- import map: OrbitControls.js imports "three" as a bare specifier -->
+<script type="importmap">
+{
+  "imports": { "three": "./vendor/three/three.module.js" }
+}
+</script>
+</head>
+<body>
+
+<div id="scene-container"></div>
+
+<!-- snapshots of the viewer's own kinematics, in load order -->
+<script src="matrix.js"></script>
+<script src="quaternion.js"></script>
+<script src="kinematics.js"></script>
+<script src="controls.js"></script>
+
+<!-- robot descriptions -->
+<script src="robots/urdf_example.js"></script>
+<script src="robots/robot_mr2.js"></script>
+
+<!-- this module's subject -->
+<script src="behavior_tree.js"></script>
+<script src="joint_trajectory.js"></script>
+<script src="joint_trajectory_action.js"></script>
+<script src="bt_tasks.js"></script>
+<script src="trees.js"></script>
+
+<script src="infrastructure.js"></script>
+
+<script type="module">
+import {
+    createViewer, buildRobotMeshes, updateRobotMeshes, buildObstacleMeshes,
+    buildWaypointGhosts, createMarkerPair, updateMarkerPair, clearExtras, resizeRenderer
+} from './scene.js';
+
+var container = document.getElementById('scene-container');
+var viewer = createViewer(container);
+
+var app = {
+    params: readBtParams(),
+    plan: null,
+    robot: null,
+    server: null,
+    tree: null,
+    blackboard: null,
+    tickCount: 0,
+    lastStatus: null,
+    lastTrace: [],
+    isRunning: false,
+    stepOnce: false,
+    ghostRobot: null
+};
+
+// A throwaway robot, used only to turn a set of joint angles into the
+// endeffector's world position for the desired-vs-actual markers. Posing
+// the real robot to answer that question would fight the servo for
+// control of it.
+function endeffectorPositionFor(positions, jointNames) {
+    if (!app.ghostRobot) {
+        app.ghostRobot = createRobotMr2();
+        initRobot(app.ghostRobot);
+    }
+    var i;
+    for (i = 0; i < jointNames.length; i++) {
+        app.ghostRobot.joints[jointNames[i]].angle = positions[i];
+    }
+    buildFKTransforms(app.ghostRobot);
+    var frame = app.ghostRobot.joints[app.ghostRobot.endeffector.frame].xform;
+    var p = matrix_multiply(frame, app.ghostRobot.endeffector.position);
+    return [p[0][0], p[1][0], p[2][0]];
+}
+
+app.reset = function () {
+    clearExtras(viewer);
+
+    app.robot = createRobotMr2();
+    initRobot(app.robot);
+
+    // start the arm at the plan's own start configuration, so the first
+    // thing the reader sees is the configuration the planner planned from
+    var start = app.plan.smoothed_positions[0];
+    var i;
+    for (i = 0; i < app.plan.joint_names.length; i++) {
+        app.robot.joints[app.plan.joint_names[i]].angle = start[i];
+    }
+
+    app.server = jointTrajectoryActionServer(app.robot);
+
+    var built = buildBtTree(app.params, app.server, app.plan);
+    app.tree = built.tree;
+    app.blackboard = built.blackboard;
+
+    app.tickCount = 0;
+    app.lastStatus = null;
+    app.lastTrace = [];
+    app.isRunning = app.params.autoplay;
+
+    if (!viewer.linkMeshes || !Object.keys(viewer.linkMeshes).length) {
+        buildRobotMeshes(viewer, app.robot);
+    }
+    if (app.params.obstacles) buildObstacleMeshes(viewer, app.plan.world);
+
+    buildFKTransforms(app.robot);
+    updateRobotMeshes(viewer, app.robot);
+};
+
+var markers = createMarkerPair(viewer);
+var hud = null;
+
+loadCommittedPlan('./plans/mr2_arm_workspace.json').then(function (plan) {
+    app.plan = plan;
+    hud = buildBtHud(container, app);
+    app.reset();
+
+    // Exposed for console inspection, the same way the IK page exposes
+    // its own app object.
+    window.app = app;
+
+    var ghostsDrawnFor = null;
+
+    createBtAnimationLoop(app, function () {
+        // ONE TICK. The world is advanced first -- the battery drains
+        // whether or not the tree asks about it -- then the tree is
+        // ticked, then the action is held if no goal is active.
+        app.blackboard.dt = 1 / app.params.rate;
+        app.blackboard.now += app.blackboard.dt;
+        if (app.params.tree === 'reactive') simulateBattery(app.blackboard);
+
+        var run = btTickTree(app.tree, app.blackboard);
+        app.lastStatus = run.status;
+        app.lastTrace = run.trace;
+        app.tickCount++;
+
+        jointTrajectoryActionHold(app.server);
+        buildFKTransforms(app.robot);
+    }, function () {
+        // every frame: draw
+        var trajectory = app.blackboard ? app.blackboard.trajectory : null;
+        if (app.params.ghosts && trajectory && ghostsDrawnFor !== trajectory) {
+            ghostsDrawnFor = trajectory;
+            buildWaypointGhosts(viewer, createRobotMr2, trajectory);
+        }
+
+        updateRobotMeshes(viewer, app.robot);
+
+        var feedback = app.server.feedback;
+        if (feedback) {
+            updateMarkerPair(markers,
+                endeffectorPositionFor(feedback.desired, feedback.joint_names),
+                endeffectorPositionFor(feedback.actual, feedback.joint_names));
+        }
+
+        renderBtHud(hud, app);
+        viewer.controls.update();
+        viewer.renderer.render(viewer.scene, viewer.camera);
+    });
+}).catch(function (error) {
+    var message = document.createElement('p');
+    message.className = 'bt-error';
+    message.textContent = 'Could not start: ' + error.message +
+        '  (this page fetches plans/mr2_arm_workspace.json, so it must be served over HTTP ' +
+        'rather than opened as a file:// URL)';
+    document.body.appendChild(message);
+    console.error(error);
+});
+
+window.addEventListener('resize', function () { resizeRenderer(viewer, container); });
+</script>
+
+</body>
+</html>

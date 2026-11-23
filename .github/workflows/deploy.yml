@@ -129,17 +129,14 @@ jobs:
           mkdir -p site/motion_planning/reference
           cp -r motion_planning/reference/. site/motion_planning/reference/
           cp site/motion_planning/reference/search_canvas.html site/motion_planning/reference/index.html
-          # same idea again for the behavior-trees reference snapshots.
-          # Unlike every other module's reference/, this one is not a
-          # runnable app -- it is dated snapshots of Rust from a DIFFERENT
-          # repository (pubsub_testbed_rs) plus the recorded tick traces,
-          # carried here because Slidev's <<< importer cannot read across
-          # repositories. There is no app to alias to index.html, so the
-          # directory carries a hand-written index.html of its own that
-          # lists each snapshot with its upstream path, length and commit;
-          # it is copied along with the files by the line below.
+          # same idea again for the behavior-trees reference implementation:
+          # the tick engine, the joint trajectory, the action server and
+          # the trees, served as a buildless page alongside its own deck.
+          # It fetches plans/mr2_arm_workspace.json at runtime, so it has
+          # to be served over HTTP -- which it is, here.
           mkdir -p site/behavior_trees/reference
           cp -r behavior_trees/reference/. site/behavior_trees/reference/
+          cp site/behavior_trees/reference/behavior_trees.html site/behavior_trees/reference/index.html
           # GitHub Pages only ever consults a 404.html at the site root, and
           # each Slidev deck is its own separately-built SPA with its own JS
           # bundle -- one deck's 404.html can't correctly bootstrap another

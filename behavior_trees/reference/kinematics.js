@@ -1,0 +1,176 @@
+/*  SNAPSHOT -- DO NOT EDIT THIS COPY
+
+    This file is a snapshot.
+    Source path:    kineval/kinematics.js
+    Snapshot date:  2026-11-23
+    Source commit:  a5d61ec
+
+    Edits belong in the source file above, and must then be
+    re-snapshotted here. `diff` of the two, ignoring this block, is the
+    cheap check; tests/smoke.cjs runs it.
+
+    WHY THE COPY EXISTS. Slidev's `<<<` snippet importer cannot read
+    outside the deck's workspace root, and behavior_trees/
+    pnpm-workspace.yaml pins that root at behavior_trees/. So
+    behavior_trees/slides/slides.md can reach ../reference/* and cannot
+    reach ../../kineval/*. forward_kinematics/reference/,
+    inverse_kinematics/reference/ and motion_planning/reference/ all carry
+    per-module copies of viewer code for the same reason.
+
+    WHAT THIS MODULE USES IT FOR. The buildless demo page needs forward
+    kinematics to draw the robot, and the joint-trajectory action needs
+    applyControls to fold its servo output into joint angles -- which is
+    the whole reason its feedback has a nonzero `error` field. Nothing in
+    this file is modified for this module.
+*/
+
+/*|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+
+    Full KinEval Reference Viewer | Robot Init + Forward Kinematics
+
+    The same completed forward-kinematics/quaternion STENCIL work as
+    ../forward_kinematics/reference/kinematics.js -- robot init (building
+    each link's parent/child joint cross-references) and the matrix-stack +
+    quaternion DFS traversal (traverseFKBase -> traverseFKLink ->
+    traverseFKJoint) -- reused here rather than re-derived, since this
+    viewer depends on that module's completed work (see ../README.md's
+    build-order table).
+
+    One naming difference from that module: each link/joint's fully-composed
+    world transform is stored as `.xform` here, not `.matrix` -- matching the
+    upstream kineval-stencil's own kineval_threejs.js (robot.links[x].xform),
+    since scene.js in this directory ports that file's rendering approach
+    directly. Every joint here is always revolute/continuous (quaternion
+    axis-angle) -- none of this viewer's three ported test robots use a
+    prismatic or fixed joint, matching upstream's own kineval_forward_kinematics.js
+    STENCIL, which doesn't address joint type at all.
+
+    This file (like every other reference implementation in this project)
+    keeps every function as a plain top-level function rather than adopting
+    upstream's "kineval = {}" namespace-object convention -- consistent with
+    this project's own house style (see pathfinding/, simulation/,
+    forward_kinematics/), not a claim that the namespace itself was ported.
+
+    @author ohseejay / https://github.com/ohseejay
+                     / https://bitbucket.org/ohseejay
+
+    Chad Jenkins
+    Laboratory for Perception RObotics and Grounded REasoning Systems
+    University of Michigan
+
+    License: Michigan Honor License
+
+|\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/|
+||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/
+/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\
+\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/||\/*/
+
+// #region robot-init
+function initRobotLinks(robot) {
+    var x;
+    for (x in robot.links) {
+        robot.links[x].name = x;
+        robot.links[x].children = [];
+        robot.links[x].parent = null;
+    }
+    robot.control = { xyz: [0, 0, 0], rpy: [0, 0, 0] };
+}
+
+function initRobotJoints(robot) {
+    var x;
+    for (x in robot.joints) {
+        robot.joints[x].name = x;
+        if (robot.joints[x].angle === undefined) robot.joints[x].angle = 0;
+        if (robot.joints[x].control === undefined) robot.joints[x].control = 0;
+
+        var parentLink = robot.links[robot.joints[x].parent];
+        var childLink = robot.links[robot.joints[x].child];
+
+        parentLink.children.push(x);
+        childLink.parent = x;
+    }
+}
+
+function initRobot(robot) {
+    initRobotLinks(robot);
+    initRobotJoints(robot);
+}
+// #endregion robot-init
+
+// #region forward-kinematics
+function matrix_from_rpy(rpy) {
+    return matrix_multiply(
+        generate_rotation_matrix_Z(rpy[2]),
+        matrix_multiply(generate_rotation_matrix_Y(rpy[1]), generate_rotation_matrix_X(rpy[0]))
+    );
+}
+
+function matrix_from_origin(origin) {
+    return matrix_multiply(generate_translation_matrix(origin.xyz[0], origin.xyz[1], origin.xyz[2]), matrix_from_rpy(origin.rpy));
+}
+
+function traverseFKJoint(robot, jointName, parentXform) {
+    var joint = robot.joints[jointName];
+
+    // the joint's fixed origin offset from its parent link
+    var jointOrigin = matrix_multiply(parentXform, matrix_from_origin(joint.origin));
+
+    // then its own variable one-DOF motion. The ported upstream robots
+    // (fetch especially) really do use all four URDF joint types, so unlike
+    // a revolute-only viewer this has to branch: prismatic joints slide
+    // along their axis, fixed joints contribute no motion at all, and
+    // revolute/continuous rotate via a quaternion built from axis+angle.
+    var jointXform;
+    if (joint.type === 'prismatic') {
+        var unitAxis = vector_normalize(joint.axis);
+        jointXform = matrix_multiply(jointOrigin, generate_translation_matrix(
+            unitAxis[0] * joint.angle, unitAxis[1] * joint.angle, unitAxis[2] * joint.angle
+        ));
+    } else if (joint.type === 'fixed') {
+        jointXform = jointOrigin;
+    } else {
+        var q = quaternion_normalize(quaternion_from_axisangle(joint.axis, joint.angle));
+        jointXform = matrix_multiply(jointOrigin, quaternion_to_rotation_matrix(q));
+    }
+
+    joint.xform = jointXform;
+    traverseFKLink(robot, joint.child, jointXform);
+}
+
+function traverseFKLink(robot, linkName, xform) {
+    var link = robot.links[linkName];
+    link.xform = xform;
+
+    var i;
+    for (i = 0; i < link.children.length; i++) {
+        traverseFKJoint(robot, link.children[i], xform);
+    }
+}
+
+function traverseFKBase(robot) {
+    var baseOrigin = matrix_from_origin(robot.origin);
+
+    // 4x1 homogeneous POINTS one unit ahead of / beside the base in world
+    // coordinates (w=1, so the base's own translation is included) -- see
+    // ../forward_kinematics/reference/kinematics.js for why these are
+    // points and not directions: userinput.js's w/s/q/e base driving
+    // recovers the direction by subtracting robot.origin.xyz back off, so
+    // with w=0 "forward" stops pointing forward once the base drives away
+    // from the world origin.
+    robot.heading = matrix_multiply(baseOrigin, [[0], [0], [1], [1]]);
+    robot.lateral = matrix_multiply(baseOrigin, [[1], [0], [0], [1]]);
+
+    traverseFKLink(robot, robot.base, baseOrigin);
+}
+
+function buildFKTransforms(robot) {
+    traverseFKBase(robot);
+}
+
+function robotForwardKinematics(robot) {
+    buildFKTransforms(robot);
+}
+// #endregion forward-kinematics

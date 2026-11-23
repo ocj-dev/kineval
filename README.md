@@ -25,7 +25,7 @@ reference code lives alongside its deck at `<topic>/reference/`.
 | Forward kinematics & quaternions | [`forward_kinematics/`](forward_kinematics/) | Built |
 | Inverse kinematics & optimization | [`inverse_kinematics/`](inverse_kinematics/) | Built |
 | RRT-Connect motion planning | [`motion_planning/`](motion_planning/) | Built |
-| Behavior trees & motion-plan execution | [`behavior_trees/`](behavior_trees/) | Built &mdash; teaches the Rust publish-subscribe system, not the KinEval viewer |
+| Behavior trees & motion-plan execution | [`behavior_trees/`](behavior_trees/) | Built |
 | Full working KinEval viewer | [`kineval/`](kineval/) | Forward + inverse kinematics (depends on the topics above) |
 
 ## License

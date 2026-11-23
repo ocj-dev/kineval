@@ -5,8 +5,11 @@
 # marks `behavior_trees/` as that root so slides/slides.md can embed
 # snippets directly from ../reference/*.rs.
 #
-# It matters more here than in the other modules: this deck quotes Rust
-# from a DIFFERENT REPOSITORY, carried in as dated snapshots. Without this
-# file the importer would refuse every one of them.
+# It does one more thing here than in the other modules: the deck's panels
+# import the committed RRT-Connect plan directly
+# (slides/lib/bt/plan.ts -> ../../../reference/plans/mr2_arm_workspace.json),
+# and Vite's filesystem allow-list is keyed off the same workspace root.
+# Without this file both the snippet imports and that JSON import would be
+# refused, and the numbers on the slides would have to be copied by hand.
 packages:
   - 'slides'

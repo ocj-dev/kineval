@@ -40,10 +40,13 @@
     <li><a class="title" href="/kineval/cloth_simulation/">2D Cloth Simulation</a><span class="status built">Built</span></li>
     <li><a class="title" href="/kineval/behavior_trees/">Behavior Trees</a><span class="status built">Built</span></li>
   </ul>
-  <p class="note">The Behavior Trees module teaches the Rust publish-subscribe system
-  (<code>pubsub_testbed_rs</code>) rather than the KinEval JavaScript viewer: how a motion plan
-  is represented as a <code>JointTrajectory</code> message, executed by a JointTrajectory action,
-  and sequenced inside a behavior tree.</p>
+  <p class="note">The Behavior Trees module starts from what a behavior tree is &mdash; ticks,
+  statuses, and the six node kinds &mdash; and then follows a KinEval motion plan all the way to
+  the robot: how an RRT-Connect plan becomes a <code>trajectory_msgs/JointTrajectory</code>, how a
+  joint-trajectory action executes it under servo control, and how a behavior tree sequences that
+  execution into tasks longer than one motion. Its reference implementation runs the
+  <code>mr2</code> arm at
+  <a href="/kineval/behavior_trees/reference/">behavior_trees/reference/</a>.</p>
 
   <footer>Source: <a href="https://github.com/ocj-dev/kineval">github.com/ocj-dev/kineval</a> &middot; reference implementation derived from <a href="https://github.com/autorob/kineval-stencil">autorob/kineval-stencil</a></footer>
 </div>
