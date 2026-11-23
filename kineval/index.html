@@ -90,12 +90,36 @@
 <script src="robots/robot_baxter.js"></script>
 <script src="robots/robot_sawyer.js"></script>
 
+<!-- collision detection + RRT-Connect motion planning, over one seeded PRNG -->
+<script src="random.js"></script>
+<script src="collision.js"></script>
+<script src="motion_plan.js"></script>
+
+<!-- planning worlds: nine ported from upstream worlds/, five parametric -->
+<script src="worlds/world_empty.js"></script>
+<script src="worlds/world_basic.js"></script>
+<script src="worlds/world_local_minima.js"></script>
+<script src="worlds/world_barrier.js"></script>
+<script src="worlds/world_s.js"></script>
+<script src="worlds/world_s_higher.js"></script>
+<script src="worlds/world_s_higher_tighter.js"></script>
+<script src="worlds/world_y.js"></script>
+<script src="worlds/world_random.js"></script>
+<script src="worlds/world_narrow_passage.js"></script>
+<script src="worlds/world_bug_trap.js"></script>
+<script src="worlds/world_two_sided_bug_trap.js"></script>
+<script src="worlds/world_arm_clutter.js"></script>
+<script src="worlds/world_sealed_enclosure.js"></script>
+
 <!-- ported upstream control/interaction layer -->
 <script src="controls.js"></script>
 <script src="userinput.js"></script>
 
 <script type="module">
-import { createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, resizeViewer, frameCameraToRobot } from './scene.js';
+import {
+    createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, resizeViewer, frameCameraToRobot,
+    buildWorldMeshes, removeWorldMeshes, createPlannerRig, updatePlannerMeshes, frameCameraToWorld
+} from './scene.js';
 import * as THREE from './vendor/three/three.module.js';
 
 var ROBOT_FACTORIES = {
@@ -107,8 +131,35 @@ var ROBOT_FACTORIES = {
     sawyer: createRobotSawyer
 };
 
+// The nine ported upstream worlds, then the five parametric generators.
+// Every planner test loops over the cross product of these and
+// ROBOT_FACTORIES, so adding an entry to either map extends coverage with
+// no test change -- which is the operational meaning of "works for any
+// provided robot description".
+var WORLD_FACTORIES = {
+    empty: createWorldEmpty,
+    basic: createWorldBasic,
+    local_minima: createWorldLocalMinima,
+    barrier: createWorldBarrier,
+    s: createWorldS,
+    s_higher: createWorldSHigher,
+    s_higher_tighter: createWorldSHigherTighter,
+    y: createWorldY,
+    random: createWorldRandom,
+    narrow_passage: createWorldNarrowPassage,
+    bug_trap: createWorldBugTrap,
+    two_sided_bug_trap: createWorldTwoSidedBugTrap,
+    arm_clutter: createWorldArmClutter,
+    sealed_enclosure: createWorldSealedEnclosure
+};
+
 var q = new URLSearchParams(window.location.search);
 var robotName = ROBOT_FACTORIES[q.get('robot')] ? q.get('robot') : 'crawler';
+var worldName = WORLD_FACTORIES[q.get('world')] ? q.get('world') : 'basic';
+// ?seed= selects the seed for every stochastic choice in the module; the
+// default is documented in random.js. The HUD echoes whichever is active,
+// so a screenshot carries what is needed to reproduce itself.
+var seedParam = parseInt(q.get('seed'), 10);
 
 var container = document.getElementById('scene-container');
 var viewer = createViewer(container);
@@ -127,10 +178,53 @@ var app = {
         // servo/setpoint control state (servo_control.js)
         setpoint_target: {},
         update_pd: false, persist_pd: false,
-        update_pd_clock: false, update_pd_dance: false
+        update_pd_clock: false, update_pd_dance: false,
+        // motion planning state (motion_plan.js / collision.js)
+        seed: isFinite(seedParam) ? seedParam : RANDOM_DEFAULT_SEED,
+        // 'planar' samples base x/z/yaw and holds y/roll/pitch; 'free'
+        // samples all six; 'none' pins the base and plans the arm alone.
+        // See motion_plan.js#randomConfig for why planar is the default.
+        plan_base_dofs: 'planar',
+        update_motion_plan: false,
+        update_motion_plan_traversal: false,
+        motion_plan_traversal_index: 0,
+        pose_setpoints: {}, setpoint_base: null, setpoint_slot: null,
+        planner: null
     }
 };
 window.app = app; // exposed for console/debugging inspection, same spirit as the inline HUD
+
+var plannerRig = createPlannerRig();
+var plannerSignature = 'none';
+
+// #region load-world
+// Worlds are reloaded whenever the world OR the robot changes: the five
+// parametric generators size themselves from the robot's own extent
+// (collision.js#robotExtent), so "narrow passage" means a different gap
+// for the crawler than for fetch, and loading a robot without rebuilding
+// the world would leave a passage sized for the previous one.
+function loadWorld(name) {
+    removeWorldMeshes(viewer, app.worldRig);
+    updatePlannerMeshes(viewer, plannerRig, null);
+    app.params.planner = null;
+
+    // re-seed before generating, so ?seed= reproduces a generated world
+    // exactly and world_random is identical across two page loads
+    seedRandom(app.params.seed);
+
+    // two different robot scales, because the generators need both: the
+    // widest single LINK (how wide a gap must be to pass through) and the
+    // whole robot's REACH (how big an enclosure must be to stand inside).
+    // See collision.js#robotExtent and #robotReach.
+    var q_now = configurationFromRobot(app.robot, app.qmap);
+    app.world = WORLD_FACTORIES[name]({
+        extent: robotExtent(app.robot),
+        reach: robotReach(app.robot, app.qmap, q_now),
+        height: robotHeight(app.robot, app.qmap, q_now)
+    });
+    app.worldRig = buildWorldMeshes(viewer, app.world);
+}
+// #endregion load-world
 
 function loadRobot(name) {
     if (app.robot) removeRobotMeshes(viewer, app.robot, app.rig);
@@ -148,16 +242,30 @@ function loadRobot(name) {
     // point) can stay put, and deriveArmChain re-derives a fresh
     // robot.ik_chain for the newly loaded robot on its first IK iteration
     app.params.setpoint_target = {};
+    app.params.setpoint_base = null;
+    app.params.pose_setpoints = {};
     app.params.dance_poses = null;
 
     app.rig = buildRobotMeshes(viewer, app.robot, app.links_geom);
+
+    // the q-vector layout and the per-link bounding boxes are both derived
+    // from this robot and are cached for the life of it. The bbox cache
+    // must come after buildRobotMeshes, which is what supplies geometry
+    // for the mesh-less robots (see collision.js#cacheLinkBoundingBoxes).
+    app.qmap = buildConfigurationIndex(app.robot);
+    cacheLinkBoundingBoxes(app.robot);
+
     robotForwardKinematics(app.robot);
     updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
     frameCameraToRobot(viewer, app.robot);
 
     initKeyEvents(app.robot, app.params);
+
+    // and the world last, since the parametric ones size to this robot
+    loadWorld(worldName);
 }
 
+seedRandom(app.params.seed);
 loadRobot(robotName);
 
 var hud = document.createElement('div');
@@ -184,6 +292,19 @@ robotSelect.addEventListener('change', function () {
 });
 controlsRow.appendChild(robotSelect);
 
+var worldSelect = document.createElement('select');
+Object.keys(WORLD_FACTORIES).forEach(function (name) {
+    var opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    if (name === worldName) opt.selected = true;
+    worldSelect.appendChild(opt);
+});
+worldSelect.addEventListener('change', function () {
+    worldName = worldSelect.value;
+    loadWorld(worldName);
+});
+controlsRow.appendChild(worldSelect);
+
 var helpBtn = document.createElement('button');
 helpBtn.textContent = 'Help (v)';
 var helpEl = document.createElement('div');
@@ -195,7 +316,11 @@ controlsRow.appendChild(helpBtn);
 hud.appendChild(helpEl);
 
 window.addEventListener('keydown', function (e) {
-    if (e.key.toLowerCase() === 'v') helpEl.style.display = helpEl.style.display === 'none' ? 'block' : 'none';
+    var k = e.key.toLowerCase();
+    if (k === 'v') helpEl.style.display = helpEl.style.display === 'none' ? 'block' : 'none';
+    // 't' frames the whole world, which is what you want once the robot
+    // has driven away from wherever the camera was pointed at load
+    if (k === 't') frameCameraToWorld(viewer, app.world);
 });
 
 function renderHudStatus() {
@@ -209,22 +334,73 @@ function renderHudStatus() {
         Math.pow(target[2] - eeWorld[2][0], 2)
     );
 
+    // The planner line carries the two measured counts this module exists
+    // to produce. Neither lecture deck states that collision checking
+    // dominates sampling-based planning cost (see the Phase 0 review
+    // findings, G-1), so rather than repeating the claim the module
+    // measures it: on any cluttered world the collision count runs well
+    // ahead of the nearest-neighbour count, in our own code, on screen.
+    var planner = app.params.planner;
+    var plannerLine = 'planner = idle';
+    if (planner) {
+        plannerLine =
+            'planner = ' + planner.state +
+            '   iter = ' + planner.iterations +
+            '   ' + planner.elapsedMs + ' ms\n' +
+            'collision checks = ' + planner.counters.collisionChecks +
+            '   nn comparisons = ' + planner.counters.nearestNeighborComparisons;
+        if (planner.state === 'found') {
+            plannerLine += '\npath = ' + planner.path.length + ' configs' +
+                ' (raw ' + planner.rawPath.length + ')' +
+                '   at index ' + app.params.motion_plan_traversal_index;
+        }
+        if (planner.failureReason) plannerLine += '\nfailed: ' + planner.failureReason;
+    }
+
     status.textContent =
         'Full KinEval Reference Viewer\n' +
-        'robot = ' + r.name + '   active joint = ' + app.params.active_joint + '\n' +
+        'robot = ' + r.name + '   world = ' + worldName + '   seed = ' + randomSeedValue() + '\n' +
+        'active joint = ' + app.params.active_joint +
+        '   goal slot = ' + (app.params.setpoint_slot === null ? 'none' : app.params.setpoint_slot) + '\n' +
         'base xyz = [' + r.origin.xyz.map(function (v) { return v.toFixed(2); }).join(', ') + ']' +
         '   rpy = [' + r.origin.rpy.map(function (v) { return v.toFixed(2); }).join(', ') + ']\n' +
-        'joint angle = ' + r.joints[app.params.active_joint].angle.toFixed(3) + '\n' +
+        'joint angle = ' + r.joints[app.params.active_joint].angle.toFixed(3) +
+        '   collision = ' + describeCollision(r.collision) + '\n' +
         'ik target = [' + target.map(function (v) { return v.toFixed(2); }).join(', ') + ']' +
-        '   endeffector error = ' + errDist.toFixed(3);
+        '   endeffector error = ' + errDist.toFixed(3) + '\n' +
+        plannerLine;
 }
 
 function frame() {
     requestAnimationFrame(frame);
     applyControls(app.robot);
     handleUserInput(app.robot, app.params, keyboard, viewer.camera);
+
+    // planning before forward kinematics: a traversal step writes the
+    // robot's pose directly, and FK has to run on the pose that results
+    // rather than on the one from the previous frame
+    planMotionRRTConnect(app.robot, app.qmap, app.world, app.params);
+
     robotForwardKinematics(app.robot);
+    robotIsCollision(app.robot, app.qmap, app.world);
     updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
+
+    // updatePlannerMeshes rebuilds the whole tree visualization, so it
+    // runs only when the tree has actually changed -- otherwise an idle
+    // page would rebuild a few thousand instanced boxes sixty times a
+    // second for no reason. The signature is cheap and changes on exactly
+    // the events that matter: a vertex added, or the state transitioning
+    // to found/failed.
+    var planner = app.params.planner;
+    var signature = planner
+        ? planner.state + ':' + (planner.T_a ? planner.T_a.vertices.length : 0) +
+          ':' + (planner.T_b ? planner.T_b.vertices.length : 0)
+        : 'none';
+    if (signature !== plannerSignature) {
+        plannerSignature = signature;
+        updatePlannerMeshes(viewer, plannerRig, planner);
+    }
+
     renderHudStatus();
     setpointClockMovement(app.robot, app.params);
     setpointDanceSequence(app.robot, app.params);
@@ -236,6 +412,57 @@ function frame() {
 requestAnimationFrame(frame);
 
 window.addEventListener('resize', function () { resizeViewer(viewer, container); });
+
+// #region test-hook
+// A small surface for the Phase 4 headless tests, which drive this real
+// page rather than a reimplementation of it -- so what is verified is
+// what ships. Everything here is a thin wrapper over what the page itself
+// already calls; nothing is a test-only code path.
+window.kinevalTest = {
+    robots: Object.keys(ROBOT_FACTORIES),
+    worlds: Object.keys(WORLD_FACTORIES),
+    app: app,
+    loadRobot: function (name) { robotName = name; loadRobot(name); },
+    loadWorld: function (name) { worldName = name; loadWorld(name); },
+    frameWorld: function () { frameCameraToWorld(viewer, app.world); },
+    setSeed: function (seed) { app.params.seed = seed; seedRandom(seed); },
+    // run a whole plan to completion synchronously, bypassing the frame
+    // budget. The cap still applies, so this terminates even on
+    // world_sealed_enclosure -- which is one of the things being tested.
+    planToCompletion: function () {
+        app.params.planner = robotRRTPlannerInit(app.robot, app.qmap, app.world, app.params);
+        var planner = app.params.planner;
+        while (planner.state === 'planning') {
+            robotRRTPlannerIterate(app.robot, app.qmap, app.world, app.params, planner);
+        }
+        return planner;
+    },
+    poseIsCollision: function (q) { return poseIsCollision(app.robot, app.qmap, q, app.world); },
+    collisionForwardKinematics: function (q) { return collisionForwardKinematics(app.robot, app.qmap, q); },
+    configurationFromRobot: function () { return configurationFromRobot(app.robot, app.qmap); },
+    applyConfiguration: function (q) { applyConfigurationToRobot(app.robot, app.qmap, q); },
+    configurationWeights: function () { return configurationWeights(app.robot, app.qmap, app.world); },
+    configurationDistance: configurationDistance,
+    // the planner's own definition of "along an edge" -- circular DOFs
+    // take the short way round, so an audit must not roll its own
+    interpolateConfiguration: interpolateConfiguration,
+    jointLimitRange: function (name) { return jointLimitRange(app.robot, name); },
+    stepSize: function () { return plannerStepSize(app.qmap); },
+    setGoalConfiguration: function (q) {
+        // the planner reads its goal from setpoint_target/setpoint_base,
+        // so a test that wants a specific goal writes it the same way the
+        // 1..9 keys do rather than through a back door
+        app.params.setpoint_target = {};
+        var x;
+        for (x in app.qmap.names) app.params.setpoint_target[x] = q[app.qmap.names[x]];
+        app.params.setpoint_base = {
+            xyz: [q[0], q[1], q[2]],
+            rpy: [q[3], q[4], q[5]]
+        };
+    }
+};
+window.kinevalReady = true;
+// #endregion test-hook
 </script>
 
 </body>

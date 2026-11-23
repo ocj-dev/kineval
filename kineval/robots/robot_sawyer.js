@@ -16,6 +16,19 @@
     instead. Forward kinematics -- the whole point of this module -- is
     unaffected: it reads origins, axes and angles, never meshes.
 
+    DATA ADDITION (2026-11-22, motion planning module): every revolute joint
+    now carries `limit: {lower, upper}`, taken verbatim from the upstream
+    kineval-stencil's own robots/sawyer/sawyer.urdf.js (sawyer_description's
+    values). No value here is estimated.
+
+    Two are worth a second look rather than a squint: `head_pan` is
+    [-5.0952, 0.9064], which is strongly asymmetric and not a mistake -- the
+    Sawyer's head really does swing much further one way -- and `right_j6`
+    is [-4.7124, 4.7124], i.e. +-3*PI/2, so that wrist exceeds a full turn
+    in each direction while still being revolute rather than continuous.
+    Both are good reasons the sampler reads limits per joint instead of
+    assuming [-PI, PI].
+
     @author ohseejay / https://github.com/ohseejay
                      / https://bitbucket.org/ohseejay
                      (original robots/sawyer/sawyer.urdf.js)
@@ -60,42 +73,50 @@ function createRobotSawyer() {
     robot.joints['right_j0'] = {
         parent: 'right_arm_base_link', child: 'right_l0', type: 'revolute',
         origin: { xyz: [0, 0, 0.08], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.0503, upper: 3.0503 }
     };
     robot.joints['head_pan'] = {
         parent: 'right_l0', child: 'head', type: 'revolute',
         origin: { xyz: [0, 0, 0.2965], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -5.0952, upper: 0.9064 }
     };
     robot.joints['right_j1'] = {
         parent: 'right_l0', child: 'right_l1', type: 'revolute',
         origin: { xyz: [0.081, 0.05, 0.237], rpy: [-1.570796, 1.570796, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.8095, upper: 2.2736 }
     };
     robot.joints['right_j2'] = {
         parent: 'right_l1', child: 'right_l2', type: 'revolute',
         origin: { xyz: [0, -0.14, 0.1425], rpy: [1.570796, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.0426, upper: 3.0426 }
     };
     robot.joints['right_j3'] = {
         parent: 'right_l2', child: 'right_l3', type: 'revolute',
         origin: { xyz: [0, -0.042, 0.26], rpy: [-1.570796, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.0439, upper: 3.0439 }
     };
     robot.joints['right_j4'] = {
         parent: 'right_l3', child: 'right_l4', type: 'revolute',
         origin: { xyz: [0, -0.125, -0.1265], rpy: [1.570796, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -2.9761, upper: 2.9761 }
     };
     robot.joints['right_j5'] = {
         parent: 'right_l4', child: 'right_l5', type: 'revolute',
         origin: { xyz: [0, 0.031, 0.275], rpy: [1.570796, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -2.9761, upper: 2.9761 }
     };
     robot.joints['right_j6'] = {
         parent: 'right_l5', child: 'right_l6', type: 'revolute',
         origin: { xyz: [0, -0.11, 0.1053], rpy: [-1.570796, -0.17453, 3.1416] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -4.7124, upper: 4.7124 }
     };
 
     robot.endeffector = {"frame":"right_j6","position":[[0.1],[0],[0],[1]]};

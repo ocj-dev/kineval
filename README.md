@@ -24,7 +24,7 @@ reference code lives alongside its deck at `<topic>/reference/`.
 | Pendularm dynamical simulation | [`simulation/`](simulation/) | Built |
 | Forward kinematics & quaternions | [`forward_kinematics/`](forward_kinematics/) | Built |
 | Inverse kinematics & optimization | [`inverse_kinematics/`](inverse_kinematics/) | Built |
-| RRT-Connect motion planning | [`motion_planning/`](motion_planning/) | Planned |
+| RRT-Connect motion planning | [`motion_planning/`](motion_planning/) | Built |
 | Full working KinEval viewer | [`kineval/`](kineval/) | Forward + inverse kinematics (depends on the topics above) |
 
 ## License

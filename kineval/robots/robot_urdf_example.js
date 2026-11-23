@@ -15,6 +15,18 @@
     upstream OrbitControls-vendoring precedent as every other reference
     implementation in this project already follows for its three.js calls).
 
+    DATA NOTE (2026-11-22, motion planning module): this description
+    declares no joint `type` for any of its joints, so the planner treats
+    every one as continuous (upstream's own rule: an absent type means
+    continuous) and samples it over [0, 2*PI). No `limit` fields were added,
+    because a continuous joint has no limits by definition.
+
+    That is physically generous for this robot -- a real joint here would
+    not rotate through its own structure -- but inventing joint types and
+    limits that the upstream description does not contain would be
+    fabricating robot data, which is worse than planning in a larger space
+    than necessary. Recorded in ../IMPLEMENTATION_NOTES.md.
+
     @author ohseejay / https://github.com/ohseejay
                      / https://bitbucket.org/ohseejay
                      (original robot_urdf_example.js)

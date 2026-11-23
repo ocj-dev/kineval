@@ -24,6 +24,14 @@
     'headnod' (declared first), so the tree is well formed and the DFS is
     well defined.
 
+    DATA ADDITION (2026-11-22, motion planning module): every revolute joint
+    now carries `limit: {lower, upper}`, taken verbatim from the upstream
+    kineval-stencil's own robots/baxter/baxter.urdf.js, which in turn carries
+    baxter_description's values. No value here is estimated. Both arms are
+    symmetric, as upstream has them. The fixed joints get no limit -- they
+    are not degrees of freedom and collision.js#buildConfigurationIndex skips
+    them entirely.
+
     @author ohseejay / https://github.com/ohseejay
                      / https://bitbucket.org/ohseejay
                      (original robots/baxter/baxter.urdf.js)
@@ -78,7 +86,8 @@ function createRobotBaxter() {
     robot.joints['headpan'] = {
         parent: 'torso', child: 'head', type: 'revolute',
         origin: { xyz: [0.06, 0, 0.686], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.14, upper: 3.14 }
     };
     robot.joints['headnod'] = {
         parent: 'head', child: 'screen', type: 'fixed',
@@ -93,37 +102,44 @@ function createRobotBaxter() {
     robot.joints['right_s0'] = {
         parent: 'right_arm_mount', child: 'right_upper_shoulder', type: 'revolute',
         origin: { xyz: [0.055695, 0, 0.011038], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -1.70167993878, upper: 1.70167993878 }
     };
     robot.joints['right_s1'] = {
         parent: 'right_upper_shoulder', child: 'right_lower_shoulder', type: 'revolute',
         origin: { xyz: [0.069, 0, 0.27035], rpy: [-1.570796, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -2.147, upper: 1.047 }
     };
     robot.joints['right_e0'] = {
         parent: 'right_lower_shoulder', child: 'right_upper_elbow', type: 'revolute',
         origin: { xyz: [0.102, 0, 0], rpy: [1.570796, 0, 1.570796] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.05417993878, upper: 3.05417993878 }
     };
     robot.joints['right_e1'] = {
         parent: 'right_upper_elbow', child: 'right_lower_elbow', type: 'revolute',
         origin: { xyz: [0.069, 0, 0.26242], rpy: [-1.570796, -1.570796, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -0.05, upper: 2.618 }
     };
     robot.joints['right_w0'] = {
         parent: 'right_lower_elbow', child: 'right_upper_forearm', type: 'revolute',
         origin: { xyz: [0.10359, 0, 0], rpy: [1.570796, 0, 1.570796] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.059, upper: 3.059 }
     };
     robot.joints['right_w1'] = {
         parent: 'right_upper_forearm', child: 'right_lower_forearm', type: 'revolute',
         origin: { xyz: [0.01, 0, 0.2707], rpy: [-1.570796, -1.570796, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -1.57079632679, upper: 2.094 }
     };
     robot.joints['right_w2'] = {
         parent: 'right_lower_forearm', child: 'right_wrist', type: 'revolute',
         origin: { xyz: [0.115975, 0, 0], rpy: [1.570796, 0, 1.570796] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.059, upper: 3.059 }
     };
     robot.joints['left_torso_arm_mount'] = {
         parent: 'torso', child: 'left_arm_mount', type: 'fixed',
@@ -133,37 +149,44 @@ function createRobotBaxter() {
     robot.joints['left_s0'] = {
         parent: 'left_arm_mount', child: 'left_upper_shoulder', type: 'revolute',
         origin: { xyz: [0.055695, 0, 0.011038], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -1.70167993878, upper: 1.70167993878 }
     };
     robot.joints['left_s1'] = {
         parent: 'left_upper_shoulder', child: 'left_lower_shoulder', type: 'revolute',
         origin: { xyz: [0.069, 0, 0.27035], rpy: [-1.570796, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -2.147, upper: 1.047 }
     };
     robot.joints['left_e0'] = {
         parent: 'left_lower_shoulder', child: 'left_upper_elbow', type: 'revolute',
         origin: { xyz: [0.102, 0, 0], rpy: [1.570796, 0, 1.570796] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.05417993878, upper: 3.05417993878 }
     };
     robot.joints['left_e1'] = {
         parent: 'left_upper_elbow', child: 'left_lower_elbow', type: 'revolute',
         origin: { xyz: [0.069, 0, 0.26242], rpy: [-1.570796, -1.570796, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -0.05, upper: 2.618 }
     };
     robot.joints['left_w0'] = {
         parent: 'left_lower_elbow', child: 'left_upper_forearm', type: 'revolute',
         origin: { xyz: [0.10359, 0, 0], rpy: [1.570796, 0, 1.570796] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.059, upper: 3.059 }
     };
     robot.joints['left_w1'] = {
         parent: 'left_upper_forearm', child: 'left_lower_forearm', type: 'revolute',
         origin: { xyz: [0.01, 0, 0.2707], rpy: [-1.570796, -1.570796, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -1.57079632679, upper: 2.094 }
     };
     robot.joints['left_w2'] = {
         parent: 'left_lower_forearm', child: 'left_wrist', type: 'revolute',
         origin: { xyz: [0.115975, 0, 0], rpy: [1.570796, 0, 1.570796] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -3.059, upper: 3.059 }
     };
 
     robot.endeffector = {"frame":"right_w2","position":[[0.1],[0],[0],[1]]};

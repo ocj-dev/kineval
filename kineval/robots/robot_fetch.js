@@ -16,6 +16,26 @@
     instead. Forward kinematics -- the whole point of this module -- is
     unaffected: it reads origins, axes and angles, never meshes.
 
+    DATA ADDITION (2026-11-22, motion planning module): every revolute and
+    prismatic joint now carries `limit: {lower, upper}`, taken verbatim from
+    the real upstream URDF -- fetch_description's fetch.urdf, vendored in the
+    upstream kineval-stencil at robots/fetch/fetch.urdf and already mirrored
+    into its robots/fetch/fetch.urdf.js. No value here is estimated. The RRT
+    sampler needs an interval per joint; without one, "sample uniformly in q"
+    is undefined for torso_lift_joint and the gripper fingers.
+
+    Note torso_lift_joint's upper limit is 0.4 m, per the URDF's own
+    `<limit ... lower="0" upper="0.4" />`. The implementation plan quoted
+    0.3861, which is the Fetch's advertised travel but not what the
+    description says; the description wins.
+
+    Note also `bellows_joint`: the URDF declares it a plain prismatic joint
+    with limits [0, 0.4] and NO `<mimic>` element, even though the bellows is
+    physically a passive cover that follows the torso lift. So by the
+    description -- which is all a planner can read -- Fetch has two
+    independent prismatic DOFs, not one, and the lecture's "DOFs: 13" on
+    roadmaps_rrt p.53 counts it as one. See the review findings' X-1/K-7.
+
     @author ohseejay / https://github.com/ohseejay
                      / https://bitbucket.org/ohseejay
                      (original robots/fetch/fetch.urdf.js)
@@ -66,7 +86,8 @@ function createRobotFetch() {
     robot.joints['torso_lift_joint'] = {
         parent: 'base_link', child: 'torso_lift_link', type: 'prismatic',
         origin: { xyz: [-0.086875, 0, 0.37743], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: 0, upper: 0.4 }
     };
     robot.joints['r_wheel_joint'] = {
         parent: 'base_link', child: 'r_wheel_link', type: 'continuous',
@@ -81,12 +102,14 @@ function createRobotFetch() {
     robot.joints['shoulder_pan_joint'] = {
         parent: 'torso_lift_link', child: 'shoulder_pan_link', type: 'revolute',
         origin: { xyz: [0.119525, 0, 0.34858], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -1.6056, upper: 1.6056 }
     };
     robot.joints['shoulder_lift_joint'] = {
         parent: 'shoulder_pan_link', child: 'shoulder_lift_link', type: 'revolute',
         origin: { xyz: [0.117, 0, 0.06], rpy: [0, 0, 0] },
-        axis: [0, 1, 0], angle: 0
+        axis: [0, 1, 0], angle: 0,
+        limit: { lower: -1.221, upper: 1.518 }
     };
     robot.joints['upperarm_roll_joint'] = {
         parent: 'shoulder_lift_link', child: 'upperarm_roll_link', type: 'continuous',
@@ -96,7 +119,8 @@ function createRobotFetch() {
     robot.joints['elbow_flex_joint'] = {
         parent: 'upperarm_roll_link', child: 'elbow_flex_link', type: 'revolute',
         origin: { xyz: [0.133, 0, 0], rpy: [0, 0, 0] },
-        axis: [0, 1, 0], angle: 0
+        axis: [0, 1, 0], angle: 0,
+        limit: { lower: -2.251, upper: 2.251 }
     };
     robot.joints['forearm_roll_joint'] = {
         parent: 'elbow_flex_link', child: 'forearm_roll_link', type: 'continuous',
@@ -106,7 +130,8 @@ function createRobotFetch() {
     robot.joints['wrist_flex_joint'] = {
         parent: 'forearm_roll_link', child: 'wrist_flex_link', type: 'revolute',
         origin: { xyz: [0.1245, 0, 0], rpy: [0, 0, 0] },
-        axis: [0, 1, 0], angle: 0
+        axis: [0, 1, 0], angle: 0,
+        limit: { lower: -2.16, upper: 2.16 }
     };
     robot.joints['wrist_roll_joint'] = {
         parent: 'wrist_flex_link', child: 'wrist_roll_link', type: 'continuous',
@@ -121,27 +146,32 @@ function createRobotFetch() {
     robot.joints['head_pan_joint'] = {
         parent: 'torso_lift_link', child: 'head_pan_link', type: 'revolute',
         origin: { xyz: [0.053125, 0, 0.603001], rpy: [0, 0, 0] },
-        axis: [0, 0, 1], angle: 0
+        axis: [0, 0, 1], angle: 0,
+        limit: { lower: -1.57, upper: 1.57 }
     };
     robot.joints['head_tilt_joint'] = {
         parent: 'head_pan_link', child: 'head_tilt_link', type: 'revolute',
         origin: { xyz: [0.14253, 0, 0.057999], rpy: [0, 0, 0] },
-        axis: [0, 1, 0], angle: 0
+        axis: [0, 1, 0], angle: 0,
+        limit: { lower: -0.76, upper: 1.45 }
     };
     robot.joints['r_gripper_finger_joint'] = {
         parent: 'gripper_link', child: 'r_gripper_finger_link', type: 'prismatic',
         origin: { xyz: [0, 0.015425, 0], rpy: [0, 0, 0] },
-        axis: [0, 1, 0], angle: 0
+        axis: [0, 1, 0], angle: 0,
+        limit: { lower: 0, upper: 0.05 }
     };
     robot.joints['l_gripper_finger_joint'] = {
         parent: 'gripper_link', child: 'l_gripper_finger_link', type: 'prismatic',
         origin: { xyz: [0, -0.015425, 0], rpy: [0, 0, 0] },
-        axis: [0, -1, 0], angle: 0
+        axis: [0, -1, 0], angle: 0,
+        limit: { lower: 0, upper: 0.05 }
     };
     robot.joints['bellows_joint'] = {
         parent: 'torso_lift_link', child: 'bellows_link', type: 'prismatic',
         origin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
-        axis: [0, 0, -1], angle: 0
+        axis: [0, 0, -1], angle: 0,
+        limit: { lower: 0, upper: 0.4 }
     };
     robot.joints['bellows_joint2'] = {
         parent: 'torso_lift_link', child: 'bellows_link2', type: 'fixed',

@@ -30,6 +30,7 @@ jobs:
             simulation/slides/package-lock.json
             forward_kinematics/slides/package-lock.json
             inverse_kinematics/slides/package-lock.json
+            motion_planning/slides/package-lock.json
 
       - name: Build the pathfinding Slidev deck
         working-directory: pathfinding/slides
@@ -61,6 +62,12 @@ jobs:
           npm install
           npm run build
 
+      - name: Build the motion_planning Slidev deck
+        working-directory: motion_planning/slides
+        run: |
+          npm install
+          npm run build
+
       - name: Assemble the site
         run: |
           mkdir -p site
@@ -70,7 +77,19 @@ jobs:
           cp -r simulation/slides/dist site/simulation
           cp -r forward_kinematics/slides/dist site/forward_kinematics
           cp -r inverse_kinematics/slides/dist site/inverse_kinematics
-          cp -r motion_planning kineval site/
+          cp -r motion_planning/slides/dist site/motion_planning
+          # kineval/ is copied as a SOURCE tree, not a built one, and that
+          # asymmetry with every other module here is deliberate: the full
+          # viewer is buildless (plain <script src> plus one ES module), so
+          # collision.js, motion_plan.js, random.js and worlds/ deploy with
+          # no build step at all. motion_planning/ used to be copied the
+          # same way, back when it was a static "coming soon" stub; now
+          # that it is a real Slidev deck it must NOT be, because this copy
+          # runs after the dist copies above and would merge the source
+          # tree straight over the built deck -- replacing the deck's
+          # index.html with the old stub while the workflow still went
+          # green. That is why motion_planning was split out of this line.
+          cp -r kineval site/
           # the 2D path-planning reference implementation is a plain,
           # dependency-free static app (no build step) -- serve it directly
           # at kineval/pathplanning/, alongside (not instead of) the
@@ -97,6 +116,11 @@ jobs:
           mkdir -p site/inverse_kinematics/reference
           cp -r inverse_kinematics/reference/. site/inverse_kinematics/reference/
           cp site/inverse_kinematics/reference/inverse_kinematics.html site/inverse_kinematics/reference/index.html
+          # same idea again for the motion-planning reference implementation:
+          # the 2D RRT canvas, served alongside its own deck
+          mkdir -p site/motion_planning/reference
+          cp -r motion_planning/reference/. site/motion_planning/reference/
+          cp site/motion_planning/reference/search_canvas.html site/motion_planning/reference/index.html
           # GitHub Pages only ever consults a 404.html at the site root, and
           # each Slidev deck is its own separately-built SPA with its own JS
           # bundle -- one deck's 404.html can't correctly bootstrap another
@@ -111,7 +135,7 @@ jobs:
           <body>
           <script>
             var path = window.location.pathname;
-            var decks = ['pathfinding', 'cloth_simulation', 'simulation', 'forward_kinematics', 'inverse_kinematics'];
+            var decks = ['pathfinding', 'cloth_simulation', 'simulation', 'forward_kinematics', 'inverse_kinematics', 'motion_planning'];
             var target = '/kineval/';
             for (var i = 0; i < decks.length; i++) {
               if (path.indexOf('/kineval/' + decks[i] + '/') === 0) {

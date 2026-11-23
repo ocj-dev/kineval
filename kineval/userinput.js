@@ -13,14 +13,19 @@
     and (for w/s/q/e) its exact robot_heading/robot_lateral-based motion
     formula, unchanged.
 
-    Also now wired up, matching upstream's own key scheme exactly: `p`
+    Also wired up, matching upstream's own key scheme exactly: `p`
     (one-shot, iterate inverse kinematics -- see inverse_kinematics.js),
     `r`/`f` (held, move the IK target up/down along world Y by upstream's
     own +-0.01 increment), and `o`/`c` (held, trigger the P-servo-to-
     setpoint and clock-driven setpoint controllers -- see servo_control.js).
-    Still out of scope: motion planning (m/n/b) and pose-setpoint slots
-    (0-9), since that module isn't built in this project yet (see
-    ../README.md's build-order table).
+
+    And now motion planning, per upstream's kineval_userinput.js:65-86:
+    `m` plans, `n`/`b` step forward and back through a found plan, and
+    `Shift+[1-9]` / `[1-9]` / `g` store, load and print pose-setpoint
+    slots (see motion_plan.js, collision.js). Note those are the VERIFIED
+    upstream semantics -- Shift to assign, unshifted to load -- rather
+    than the "0-9 pose-setpoint slots" that kineval/README.md used to
+    describe; the README has been corrected to match the source.
 
     Uses a minimal inline held-keys Set, the same "one dependency fewer"
     replacement for the upstream stencil's vendored THREEx.KeyboardState
@@ -142,6 +147,23 @@ function handleUserInput(robot, params, keyboard, camera) {
 // one-shot (keydown, not held) bindings for discrete active-joint navigation
 function initKeyEvents(robot, params) {
     window.addEventListener('keydown', function (e) {
+        // pose-setpoint slots and motion-plan traversal, matching upstream
+        // kineval_userinput.js:65-86 exactly: Shift+[1-9] assigns the
+        // current pose to a slot, [1-9] loads a slot as the setpoint
+        // target (which is the planner's goal), g prints the slots.
+        //
+        // Checked before the lower-cased switch below because the digit
+        // keys carry no case and Shift is the only thing distinguishing
+        // assign from load. e.key is '1'..'9' with or without Shift on a
+        // number row, so e.shiftKey is the discriminator rather than the
+        // shifted character ('!' etc.), which differs by layout.
+        if (e.key >= '1' && e.key <= '9') {
+            var slot = parseInt(e.key, 10);
+            if (e.shiftKey) assignPoseSetpoint(robot, params, slot);
+            else loadPoseSetpoint(robot, params, slot);
+            return;
+        }
+
         switch (e.key.toLowerCase()) {
             case 'j': changeActiveLinkDown(robot, params); break;
             case 'k': changeActiveLinkUp(robot, params); break;
@@ -150,10 +172,72 @@ function initKeyEvents(robot, params) {
             // one-shot IK iteration request, consumed and cleared by
             // robotInverseKinematics (inverse_kinematics.js) on the next frame
             case 'p': params.update_ik = true; break;
+
+            // one-shot motion-planning request, consumed and cleared by
+            // planMotionRRTConnect (motion_plan.js) on the next frame.
+            // Plans from the robot's CURRENT pose to whatever is in
+            // params.setpoint_target, so the workflow is: drive the robot
+            // to a goal pose, Shift+1 to store it, drive back, 1 to select
+            // it, m to plan.
+            case 'm': params.update_motion_plan = true; break;
+
+            // n/b are pure index navigation over a COMPLETED plan -- they
+            // do no planning and have no effect before one exists. Clamped
+            // at both ends rather than wrapping (see
+            // motion_plan.js#stepMotionPlanTraversal).
+            case 'n': stepMotionPlanTraversal(params, 1); break;
+            case 'b': stepMotionPlanTraversal(params, -1); break;
+
+            case 'g': printPoseSetpoints(params); break;
         }
     });
 }
 // #endregion handle-user-input
+
+// #region pose-setpoints
+// Nine slots holding whole robot poses -- every joint angle plus the base
+// pose. This is the module's goal-selection mechanism: the planner plans
+// to whichever slot was last loaded.
+//
+// The base pose is stored alongside the joint angles, which upstream does
+// not do (its setpoints are joint-only). Without it, "plan to slot 1"
+// would mean "reach that arm configuration wherever you happen to be
+// standing", and every plan in every ground-plane world would be solvable
+// without the base moving at all -- which makes thirteen of the fourteen
+// worlds pointless.
+function assignPoseSetpoint(robot, params, slot) {
+    if (!params.pose_setpoints) params.pose_setpoints = {};
+
+    var pose = { joints: {}, base: { xyz: robot.origin.xyz.slice(), rpy: robot.origin.rpy.slice() } };
+    var x;
+    for (x in robot.joints) pose.joints[x] = robot.joints[x].angle;
+
+    params.pose_setpoints[slot] = pose;
+    params.setpoint_slot = slot;
+    console.log('kineval: pose setpoint ' + slot + ' assigned from current pose');
+}
+
+function loadPoseSetpoint(robot, params, slot) {
+    if (!params.pose_setpoints || !params.pose_setpoints[slot]) {
+        console.warn('kineval: pose setpoint ' + slot + ' is empty; assign it first with Shift+' + slot);
+        return;
+    }
+    var pose = params.pose_setpoints[slot];
+
+    // these two are what robotRRTPlannerInit reads as its goal
+    params.setpoint_target = {};
+    var x;
+    for (x in pose.joints) params.setpoint_target[x] = pose.joints[x];
+    params.setpoint_base = { xyz: pose.base.xyz.slice(), rpy: pose.base.rpy.slice() };
+
+    params.setpoint_slot = slot;
+    console.log('kineval: pose setpoint ' + slot + ' loaded as planning goal / servo target');
+}
+
+function printPoseSetpoints(params) {
+    console.log('kineval: pose setpoints', params.pose_setpoints || {});
+}
+// #endregion pose-setpoints
 
 var HELP_TEXT =
     'KinEval full viewer -- forward kinematics controls' +
@@ -166,4 +250,14 @@ var HELP_TEXT =
     '<br>r/f : move inverse kinematics target up/down' +
     '<br>o : control robot arm to current setpoint target' +
     '<br>c : execute clock-driven setpoint controller' +
+    '<br>&nbsp;' +
+    '<br>motion planning (RRT-Connect)' +
+    '<br>Shift+1..9 : store the current pose in a setpoint slot' +
+    '<br>1..9 : load a slot as the planning goal' +
+    '<br>g : print the setpoint slots to the console' +
+    '<br>m : plan from the current pose to the loaded goal' +
+    '<br>n/b : step forward/back through a found plan' +
+    '<br>&nbsp;' +
+    '<br>t : frame the camera on the whole world' +
+    '<br>?robot= ?world= ?seed= select robot, world and random seed' +
     '<br>v : show this help';
