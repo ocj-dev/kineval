@@ -247,7 +247,27 @@ function removeWorldMeshes(viewer, worldRig) {
 // Rebuilt wholesale rather than incrementally: the planner adds vertices
 // in bursts of tens per frame, and a thousand individually-added meshes
 // costs far more than one rebuilt InstancedMesh.
-function updatePlannerMeshes(viewer, plannerRig, planner) {
+// GROUND-PLANE INDICATORS. Every marker is laid flat ON THE GROUND, at a
+// fixed small height, not at the configuration's own base height.
+//
+// Upstream puts its cube at the base location itself
+// (add_config_origin_indicator_geom), and that is wrong for two of this
+// viewer's robots: the crawler's base origin sits at y = 1 and fetch's at
+// y = 0.1, so their search trees float in mid-air at an arbitrary height
+// that has nothing to do with the search. Dropping every marker to the
+// ground turns the picture into what it actually is -- a plan view of
+// where the base went -- and makes two trees at different robot heights
+// directly comparable.
+//
+// The two trees are coloured SEPARATELY. T_a and T_b swap every
+// iteration, so the colours follow `aIsStartTree` and always mean
+// "grown from the start" (blue) and "grown from the goal" (green)
+// rather than "whichever tree is currently being extended".
+//
+// Markers are sized from the world, not fixed: 0.06 is invisible in
+// world_random's 52-metre boundary and clutters world_basic's 10-metre
+// one.
+function updatePlannerMeshes(viewer, plannerRig, planner, world) {
     if (plannerRig.group) {
         plannerRig.group.traverse(function (child) {
             if (child.geometry) child.geometry.dispose();
@@ -258,27 +278,51 @@ function updatePlannerMeshes(viewer, plannerRig, planner) {
     if (!planner) return;
 
     var group = new THREE.Group();
-    var trees = [planner.T_a, planner.T_b];
-    var vertexGeometry = new THREE.BoxGeometry(0.06, 0.06, 0.06);
+
+    // sit just above the ground plane so the markers are not z-fighting
+    // with it, and scale with the world so they are visible at any extent
+    var span = 10;
+    if (world && world.boundary) {
+        span = Math.max(
+            Math.abs(world.boundary[1][0] - world.boundary[0][0]),
+            Math.abs(world.boundary[1][2] - world.boundary[0][2])
+        ) || 10;
+    }
+    var markerSize = Math.max(0.05, span * 0.008);
+    var groundY = markerSize * 0.5 + 0.01;
+
+    // T_a is whichever tree is being extended this iteration, so resolve
+    // back to start/goal before choosing a colour
+    var startTree = planner.aIsStartTree ? planner.T_a : planner.T_b;
+    var goalTree = planner.aIsStartTree ? planner.T_b : planner.T_a;
+    var trees = [
+        { tree: startTree, material: plannerRig.startTreeMaterial },
+        { tree: goalTree, material: plannerRig.goalTreeMaterial }
+    ];
+
+    var vertexGeometry = new THREE.BoxGeometry(markerSize, markerSize * 0.35, markerSize);
 
     var t, i;
     for (t = 0; t < trees.length; t++) {
-        if (!trees[t]) continue;
-        var count = trees[t].vertices.length;
-        var instanced = new THREE.InstancedMesh(vertexGeometry, plannerRig.treeMaterial, count);
+        if (!trees[t].tree) continue;
+        var count = trees[t].tree.vertices.length;
+        if (!count) continue;
+        var instanced = new THREE.InstancedMesh(vertexGeometry, trees[t].material, count);
         var matrix = new THREE.Matrix4();
         for (i = 0; i < count; i++) {
-            var q = trees[t].vertices[i].vertex;
-            matrix.makeTranslation(q[0], q[1], q[2]);
+            var q = trees[t].tree.vertices[i].vertex;
+            matrix.makeTranslation(q[0], groundY, q[2]);
             instanced.setMatrixAt(i, matrix);
         }
         instanced.instanceMatrix.needsUpdate = true;
         group.add(instanced);
     }
 
+    // the found path, also on the ground, drawn a little higher than the
+    // vertex markers so it reads on top of them
     if (planner.state === 'found' && planner.path && planner.path.length > 1) {
         var points = planner.path.map(function (q) {
-            return new THREE.Vector3(q[0], q[1], q[2]);
+            return new THREE.Vector3(q[0], groundY + markerSize * 0.4, q[2]);
         });
         group.add(new THREE.Line(
             new THREE.BufferGeometry().setFromPoints(points),
@@ -290,11 +334,76 @@ function updatePlannerMeshes(viewer, plannerRig, planner) {
     plannerRig.group = group;
 }
 
+// #region goal-ghost
+// A semi-transparent copy of the robot's own geometry, posed at the goal
+// configuration.
+//
+// Shares each link's GEOMETRY with the live robot (so the ghost is
+// exactly the robot, not an approximation of it) but uses its own
+// material. It therefore must never dispose that geometry --
+// removeRobotMeshes owns it.
+//
+// `depthWrite: false` matters: without it the transparent links occlude
+// each other in whatever order they happen to be drawn, and the ghost
+// reads as a solid object with holes punched in it rather than as a
+// translucent one.
+function buildGoalGhost(viewer, robot) {
+    var material = new THREE.MeshLambertMaterial({
+        color: 0x188038, transparent: true, opacity: 0.32, depthWrite: false
+    });
+    var group = new THREE.Group();
+    group.visible = false;
+
+    var meshes = {};
+    var x;
+    for (x in robot.links) {
+        var source = robot.links[x].geom;
+        if (!source || !source.geometry) continue;
+        var mesh = new THREE.Mesh(source.geometry, material);
+        mesh.matrixAutoUpdate = false;
+        meshes[x] = mesh;
+        group.add(mesh);
+    }
+
+    viewer.scene.add(group);
+    return { group: group, material: material, meshes: meshes };
+}
+
+function removeGoalGhost(viewer, ghost) {
+    if (!ghost) return;
+    // geometry belongs to the live robot's meshes -- dispose only the
+    // material this ghost owns
+    viewer.scene.remove(ghost.group);
+    ghost.material.dispose();
+}
+
+// Poses the ghost from a {linkName: xform} map, which is exactly what
+// collision.js#collisionForwardKinematics returns for a hypothetical
+// configuration -- the same pure traversal the planner uses to ask "would
+// this pose collide", reused here to ask "what would this pose look
+// like".
+function updateGoalGhost(ghost, xforms, visible) {
+    if (!ghost) return;
+    ghost.group.visible = !!visible;
+    if (!visible || !xforms) return;
+    var x;
+    for (x in ghost.meshes) {
+        if (!xforms[x]) continue;
+        ghost.meshes[x].matrix.copy(matrix4FromArray(xforms[x]));
+    }
+}
+// #endregion goal-ghost
+
 function createPlannerRig() {
     return {
         group: null,
-        treeMaterial: new THREE.MeshLambertMaterial({
-            color: 0xffd34d, transparent: true, opacity: 0.7
+        // one colour per tree, resolved to start/goal rather than to
+        // T_a/T_b -- see updatePlannerMeshes
+        startTreeMaterial: new THREE.MeshLambertMaterial({
+            color: 0x1a73e8, transparent: true, opacity: 0.75
+        }),
+        goalTreeMaterial: new THREE.MeshLambertMaterial({
+            color: 0x188038, transparent: true, opacity: 0.75
         }),
         // red, matching upstream's own found-path highlight
         // (kineval_rrt_connect.js:536, `color = {r:1,g:0,b:0}`)
@@ -420,5 +529,6 @@ function resizeViewer(viewer, container) {
 export {
     createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes,
     frameCameraToRobot, frameCameraToWorld, resizeViewer,
-    buildWorldMeshes, removeWorldMeshes, createPlannerRig, updatePlannerMeshes
+    buildWorldMeshes, removeWorldMeshes, createPlannerRig, updatePlannerMeshes,
+    buildGoalGhost, removeGoalGhost, updateGoalGhost
 };

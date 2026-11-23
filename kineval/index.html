@@ -60,6 +60,10 @@
     font: inherit; font-size: 0.85em; padding: 0.3em 0.7em; border-radius: 6px; border: 1px solid #c7cad1; background: #fff; cursor: pointer;
   }
   .kv-help { font-family: 'Roboto Mono', monospace; font-size: 0.72em; line-height: 1.6; margin-top: 0.5em; }
+  /* the action row sits under the robot/world dropdowns */
+  .kv-actions { margin-top: 0.4em; }
+  .kv-actions button { font-weight: 600; }
+  .kv-actions button.kv-off { opacity: 0.45; }
 </style>
 
 <!-- import map: OrbitControls.js imports "three" as a bare specifier -->
@@ -118,7 +122,8 @@
 <script type="module">
 import {
     createViewer, buildRobotMeshes, removeRobotMeshes, updateRobotMeshes, resizeViewer, frameCameraToRobot,
-    buildWorldMeshes, removeWorldMeshes, createPlannerRig, updatePlannerMeshes, frameCameraToWorld
+    buildWorldMeshes, removeWorldMeshes, createPlannerRig, updatePlannerMeshes, frameCameraToWorld,
+    buildGoalGhost, removeGoalGhost, updateGoalGhost
 } from './scene.js';
 import * as THREE from './vendor/three/three.module.js';
 
@@ -189,6 +194,13 @@ var app = {
         update_motion_plan_traversal: false,
         motion_plan_traversal_index: 0,
         pose_setpoints: {}, setpoint_base: null, setpoint_slot: null,
+        // THE planning goal, as a q vector, however it was set: the
+        // "Set Goal" button, a [1-9] slot load, or the default. One
+        // field so there is exactly one answer to "what is the goal".
+        goal_config: null,
+        goal_source: 'zero configuration at the world origin',
+        show_goal_ghost: true,
+        status_message: null, status_message_at: 0,
         planner: null
     }
 };
@@ -205,7 +217,7 @@ var plannerSignature = 'none';
 // the world would leave a passage sized for the previous one.
 function loadWorld(name) {
     removeWorldMeshes(viewer, app.worldRig);
-    updatePlannerMeshes(viewer, plannerRig, null);
+    updatePlannerMeshes(viewer, plannerRig, null, app.world);
     app.params.planner = null;
 
     // re-seed before generating, so ?seed= reproduces a generated world
@@ -227,6 +239,9 @@ function loadWorld(name) {
 // #endregion load-world
 
 function loadRobot(name) {
+    // the ghost shares each link's geometry with the live robot, so it
+    // has to go before removeRobotMeshes disposes that geometry
+    if (app.goalGhost) { removeGoalGhost(viewer, app.goalGhost); app.goalGhost = null; }
     if (app.robot) removeRobotMeshes(viewer, app.robot, app.rig);
 
     var built = ROBOT_FACTORIES[name](THREE);
@@ -254,6 +269,17 @@ function loadRobot(name) {
     // for the mesh-less robots (see collision.js#cacheLinkBoundingBoxes).
     app.qmap = buildConfigurationIndex(app.robot);
     cacheLinkBoundingBoxes(app.robot);
+    // userinput.js turns a stored pose into a q vector and needs the
+    // layout; this is the one place that layout is derived
+    app.params.qmap = app.qmap;
+
+    // the default goal: the zero configuration at the world origin,
+    // matching upstream. Recomputed per robot, since its length is the
+    // robot's DOF count.
+    app.params.goal_config = zeroConfiguration(app.qmap);
+    app.params.goal_source = 'zero configuration at the world origin';
+
+    app.goalGhost = buildGoalGhost(viewer, app.robot);
 
     robotForwardKinematics(app.robot);
     updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
@@ -305,6 +331,43 @@ worldSelect.addEventListener('change', function () {
 });
 controlsRow.appendChild(worldSelect);
 
+// A second row of controls, under the robot/world dropdowns: the two
+// actions that make the planner usable without touching the keyboard.
+// `m` and the Set Goal button do exactly what the keys do -- they set
+// the same flags on the same params object -- so there is no second code
+// path to keep in sync.
+var actionRow = document.createElement('div');
+actionRow.className = 'kv-controls kv-actions';
+hud.appendChild(actionRow);
+
+var setGoalBtn = document.createElement('button');
+setGoalBtn.textContent = 'Set Goal';
+setGoalBtn.title = 'Use the robot\'s current configuration as the planning goal';
+setGoalBtn.addEventListener('click', function () {
+    app.params.goal_config = configurationFromRobot(app.robot, app.qmap);
+    app.params.goal_source = 'current pose';
+    app.params.setpoint_slot = null;
+    setStatusMessage(app.params, 'goal set from the current pose');
+});
+actionRow.appendChild(setGoalBtn);
+
+var planBtn = document.createElement('button');
+planBtn.textContent = 'Plan to Goal';
+planBtn.title = 'Plan from the current configuration to the goal (same as pressing m)';
+planBtn.addEventListener('click', function () {
+    app.params.update_motion_plan = true;
+});
+actionRow.appendChild(planBtn);
+
+var ghostBtn = document.createElement('button');
+ghostBtn.textContent = 'Goal Ghost';
+ghostBtn.title = 'Show or hide the translucent robot at the goal configuration';
+ghostBtn.addEventListener('click', function () {
+    app.params.show_goal_ghost = !app.params.show_goal_ghost;
+    ghostBtn.classList.toggle('kv-off', !app.params.show_goal_ghost);
+});
+actionRow.appendChild(ghostBtn);
+
 var helpBtn = document.createElement('button');
 helpBtn.textContent = 'Help (v)';
 var helpEl = document.createElement('div');
@@ -312,7 +375,7 @@ helpEl.className = 'kv-help';
 helpEl.style.display = 'none';
 helpEl.innerHTML = HELP_TEXT;
 helpBtn.addEventListener('click', function () { helpEl.style.display = helpEl.style.display === 'none' ? 'block' : 'none'; });
-controlsRow.appendChild(helpBtn);
+actionRow.appendChild(helpBtn);
 hud.appendChild(helpEl);
 
 window.addEventListener('keydown', function (e) {
@@ -341,34 +404,68 @@ function renderHudStatus() {
     // measures it: on any cluttered world the collision count runs well
     // ahead of the nearest-neighbour count, in our own code, on screen.
     var planner = app.params.planner;
-    var plannerLine = 'planner = idle';
-    if (planner) {
-        plannerLine =
+
+    // The line under `active joint`: what the planner is doing RIGHT
+    // NOW. `state` is the run (planning / found / failed); `lastExtend`
+    // and `lastConnect` are the algorithm's own three-valued step
+    // results, which is what makes a search in progress legible instead
+    // of just a spinning counter.
+    var plannerStatus;
+    if (!planner) {
+        plannerStatus = 'planner = idle   (press m, or Plan to Goal)';
+    } else {
+        // Reported as START and GOAL, not as T_a and T_b: the two swap
+        // every iteration, so labelling them A and B would make both
+        // numbers jump between meanings twice a second. These match the
+        // two tree colours on the ground plane.
+        var startTree = planner.aIsStartTree ? planner.T_a : planner.T_b;
+        var goalTree = planner.aIsStartTree ? planner.T_b : planner.T_a;
+        var nStart = startTree ? startTree.vertices.length : 0;
+        var nGoal = goalTree ? goalTree.vertices.length : 0;
+        plannerStatus =
             'planner = ' + planner.state +
-            '   iter = ' + planner.iterations +
-            '   ' + planner.elapsedMs + ' ms\n' +
+            '   extend = ' + planner.lastExtend +
+            '   connect = ' + planner.lastConnect + '\n' +
+            'iterations = ' + planner.iterations +
+            '   tree configs = ' + (nStart + nGoal) +
+            ' (start ' + nStart + ', goal ' + nGoal + ')';
+    }
+
+    var plannerDetail = '';
+    if (planner) {
+        plannerDetail =
             'collision checks = ' + planner.counters.collisionChecks +
-            '   nn comparisons = ' + planner.counters.nearestNeighborComparisons;
+            '   nn comparisons = ' + planner.counters.nearestNeighborComparisons +
+            '   ' + planner.elapsedMs + ' ms';
         if (planner.state === 'found') {
-            plannerLine += '\npath = ' + planner.path.length + ' configs' +
+            plannerDetail += '\npath = ' + planner.path.length + ' configs' +
                 ' (raw ' + planner.rawPath.length + ')' +
-                '   at index ' + app.params.motion_plan_traversal_index;
+                '   at index ' + app.params.motion_plan_traversal_index + '/' + (planner.path.length - 1);
         }
-        if (planner.failureReason) plannerLine += '\nfailed: ' + planner.failureReason;
+        if (planner.failureReason) plannerDetail += '\nfailed: ' + planner.failureReason;
+    }
+
+    // a slot store/load, or a goal change, announced for a few seconds
+    var message = '';
+    if (app.params.status_message && Date.now() - app.params.status_message_at < 6000) {
+        message = '\n>> ' + app.params.status_message;
     }
 
     status.textContent =
         'Full KinEval Reference Viewer\n' +
         'robot = ' + r.name + '   world = ' + worldName + '   seed = ' + randomSeedValue() + '\n' +
-        'active joint = ' + app.params.active_joint +
-        '   goal slot = ' + (app.params.setpoint_slot === null ? 'none' : app.params.setpoint_slot) + '\n' +
+        'active joint = ' + app.params.active_joint + '\n' +
+        plannerStatus + '\n' +
+        'goal = ' + app.params.goal_source +
+        '   slot = ' + (app.params.setpoint_slot === null ? 'none' : app.params.setpoint_slot) + '\n' +
         'base xyz = [' + r.origin.xyz.map(function (v) { return v.toFixed(2); }).join(', ') + ']' +
         '   rpy = [' + r.origin.rpy.map(function (v) { return v.toFixed(2); }).join(', ') + ']\n' +
         'joint angle = ' + r.joints[app.params.active_joint].angle.toFixed(3) +
         '   collision = ' + describeCollision(r.collision) + '\n' +
         'ik target = [' + target.map(function (v) { return v.toFixed(2); }).join(', ') + ']' +
-        '   endeffector error = ' + errDist.toFixed(3) + '\n' +
-        plannerLine;
+        '   endeffector error = ' + errDist.toFixed(3) +
+        (plannerDetail ? '\n' + plannerDetail : '') +
+        message;
 }
 
 function frame() {
@@ -385,6 +482,19 @@ function frame() {
     robotIsCollision(app.robot, app.qmap, app.world);
     updateRobotMeshes(app.robot, app.rig, app.params.active_joint);
 
+    // Pose the goal ghost from the PURE forward kinematics
+    // (collision.js#collisionForwardKinematics) -- the same traversal the
+    // planner uses to ask "would this pose collide", reused to ask "what
+    // would this pose look like". Using the rendering FK here would
+    // overwrite the live robot's own transforms, which is the whole
+    // reason the pure version exists.
+    if (app.goalGhost) {
+        var showGhost = app.params.show_goal_ghost && !!app.params.goal_config;
+        updateGoalGhost(app.goalGhost,
+            showGhost ? collisionForwardKinematics(app.robot, app.qmap, app.params.goal_config) : null,
+            showGhost);
+    }
+
     // updatePlannerMeshes rebuilds the whole tree visualization, so it
     // runs only when the tree has actually changed -- otherwise an idle
     // page would rebuild a few thousand instanced boxes sixty times a
@@ -398,7 +508,7 @@ function frame() {
         : 'none';
     if (signature !== plannerSignature) {
         plannerSignature = signature;
-        updatePlannerMeshes(viewer, plannerRig, planner);
+        updatePlannerMeshes(viewer, plannerRig, planner, app.world);
     }
 
     renderHudStatus();
@@ -449,17 +559,20 @@ window.kinevalTest = {
     jointLimitRange: function (name) { return jointLimitRange(app.robot, name); },
     stepSize: function () { return plannerStepSize(app.qmap); },
     setGoalConfiguration: function (q) {
-        // the planner reads its goal from setpoint_target/setpoint_base,
-        // so a test that wants a specific goal writes it the same way the
-        // 1..9 keys do rather than through a back door
-        app.params.setpoint_target = {};
-        var x;
-        for (x in app.qmap.names) app.params.setpoint_target[x] = q[app.qmap.names[x]];
-        app.params.setpoint_base = {
-            xyz: [q[0], q[1], q[2]],
-            rpy: [q[3], q[4], q[5]]
-        };
-    }
+        // params.goal_config IS the goal, whichever of the three ways
+        // set it -- the Set Goal button, a [1-9] slot load, or this.
+        // One field, so a test cannot disagree with the UI about what
+        // the planner will aim at.
+        app.params.goal_config = q.slice();
+        app.params.goal_source = 'set by test';
+    },
+    goalConfiguration: function () { return app.params.goal_config; },
+    zeroConfiguration: function () { return zeroConfiguration(app.qmap); },
+    // the two HUD buttons, so a test drives the same code path a click does
+    clickSetGoal: function () { setGoalBtn.click(); },
+    clickPlanToGoal: function () { planBtn.click(); },
+    statusText: function () { return status.textContent; },
+    goalGhostVisible: function () { return !!(app.goalGhost && app.goalGhost.group.visible); }
 };
 window.kinevalReady = true;
 // #endregion test-hook

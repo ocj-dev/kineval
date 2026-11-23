@@ -54,16 +54,34 @@ taken from this file's earlier description of it:
 | `Shift`+`1`–`9` | store the current whole-robot pose in a setpoint slot |
 | `1`–`9` | load a slot as the planning goal (and the servo target) |
 | `g` | print the setpoint slots to the console |
-| `m` | plan from the current pose to the loaded goal |
+| `m` | plan from the current pose to the goal |
 | `n` / `b` | step forward / back through a found plan, clamped at both ends |
+| `t` | frame the camera on the whole world |
 
-So the workflow is: drive the robot to a goal pose, `Shift+1` to store it, drive back, `1` to
-select it, `m` to plan, then `n` to walk the result.
+and three buttons under the robot/world dropdowns:
 
-Planning is synchronous-in-frames — `m` arms the planner and the main loop runs a bounded batch of
-iterations per frame, so the viewer never locks. The HUD shows the planner state
-(`idle | planning | found | failed`), the iteration count, the active seed, and counts of collision
-checks and nearest-neighbour comparisons.
+| Button | Behaviour |
+|---|---|
+| **Set Goal** | use the robot's current configuration as the planning goal |
+| **Plan to Goal** | plan from here to the goal — the same thing `m` does |
+| **Goal Ghost** | show/hide the translucent robot drawn at the goal |
+
+**The default goal is the zero configuration at the world origin** — base at (0,0,0), every
+joint at 0 — which is upstream's own convention. So the shortest useful workflow is: drive the
+robot somewhere with `w`/`s`/`a`/`d`, then press **Plan to Goal**, then `n` to walk the result.
+A goal identical to the start is refused with a message rather than silently "solved".
+
+To plan to a pose of your own instead: drive the robot there, `Shift+1` to store it, drive
+back, `1` to select it, then `m`. Or just press **Set Goal** where you are and drive elsewhere
+before planning.
+
+Planning is synchronous-in-frames — `m` arms the planner and the main loop plans for a bounded
+number of milliseconds per frame, so the viewer never locks. The HUD line under `active joint`
+shows the run state (`idle | planning | found | failed`), the **last `extend` and `connect`
+results** in the algorithm's own `reached`/`advanced`/`trapped` vocabulary, the iteration count,
+and the number of configurations on each tree — so you can watch the search rather than wait for
+it. Below that: the goal and where it came from, the collision-check and nearest-neighbour
+counts, and the active seed.
 
 ### URL parameters
 

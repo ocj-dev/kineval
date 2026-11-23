@@ -147,18 +147,20 @@ function handleUserInput(robot, params, keyboard, camera) {
 // one-shot (keydown, not held) bindings for discrete active-joint navigation
 function initKeyEvents(robot, params) {
     window.addEventListener('keydown', function (e) {
-        // pose-setpoint slots and motion-plan traversal, matching upstream
-        // kineval_userinput.js:65-86 exactly: Shift+[1-9] assigns the
-        // current pose to a slot, [1-9] loads a slot as the setpoint
-        // target (which is the planner's goal), g prints the slots.
+        // Pose-setpoint slots, matching upstream kineval_userinput.js:65-86:
+        // Shift+[1-9] stores the current pose in a slot, [1-9] loads a
+        // slot as the planning goal and servo target, g prints the slots.
         //
-        // Checked before the lower-cased switch below because the digit
-        // keys carry no case and Shift is the only thing distinguishing
-        // assign from load. e.key is '1'..'9' with or without Shift on a
-        // number row, so e.shiftKey is the discriminator rather than the
-        // shifted character ('!' etc.), which differs by layout.
-        if (e.key >= '1' && e.key <= '9') {
-            var slot = parseInt(e.key, 10);
+        // KEYED ON e.code, NOT e.key. Shift+3 does not produce '3' -- on a
+        // US layout it produces '#', on others something else again -- so
+        // the obvious `e.key >= '1' && e.key <= '9'` check silently never
+        // fires for the SHIFTED case, and storing a slot does nothing at
+        // all. (It did exactly that here until a headless test pressed
+        // the key and read the event back.) e.code is the physical key
+        // and is layout-independent: Digit1..Digit9 either way.
+        var digit = /^Digit([1-9])$/.exec(e.code || '');
+        if (digit) {
+            var slot = parseInt(digit[1], 10);
             if (e.shiftKey) assignPoseSetpoint(robot, params, slot);
             else loadPoseSetpoint(robot, params, slot);
             return;
@@ -196,8 +198,9 @@ function initKeyEvents(robot, params) {
 
 // #region pose-setpoints
 // Nine slots holding whole robot poses -- every joint angle plus the base
-// pose. This is the module's goal-selection mechanism: the planner plans
-// to whichever slot was last loaded.
+// pose. Storing a slot and loading a slot are the two ways the planning
+// goal gets set from the keyboard; the "Set Goal" button in the HUD is
+// the third.
 //
 // The base pose is stored alongside the joint angles, which upstream does
 // not do (its setpoints are joint-only). Without it, "plan to slot 1"
@@ -205,6 +208,11 @@ function initKeyEvents(robot, params) {
 // standing", and every plan in every ground-plane world would be solvable
 // without the base moving at all -- which makes thirteen of the fourteen
 // worlds pointless.
+//
+// Every slot operation reports itself through params.status_message, so
+// the HUD can say what just happened. A keystroke that changes the
+// planning goal and gives no feedback is indistinguishable from a
+// keystroke that did nothing.
 function assignPoseSetpoint(robot, params, slot) {
     if (!params.pose_setpoints) params.pose_setpoints = {};
 
@@ -214,28 +222,63 @@ function assignPoseSetpoint(robot, params, slot) {
 
     params.pose_setpoints[slot] = pose;
     params.setpoint_slot = slot;
-    console.log('kineval: pose setpoint ' + slot + ' assigned from current pose');
+    setStatusMessage(params, 'stored current pose to slot ' + slot);
+    console.log('kineval: pose setpoint ' + slot + ' stored from the current pose');
 }
 
 function loadPoseSetpoint(robot, params, slot) {
     if (!params.pose_setpoints || !params.pose_setpoints[slot]) {
-        console.warn('kineval: pose setpoint ' + slot + ' is empty; assign it first with Shift+' + slot);
+        setStatusMessage(params, 'slot ' + slot + ' is empty -- store one with Shift+' + slot);
+        console.warn('kineval: pose setpoint ' + slot + ' is empty; store it first with Shift+' + slot);
         return;
     }
     var pose = params.pose_setpoints[slot];
 
-    // these two are what robotRRTPlannerInit reads as its goal
+    // the servo target (o/c keys) ...
     params.setpoint_target = {};
     var x;
     for (x in pose.joints) params.setpoint_target[x] = pose.joints[x];
     params.setpoint_base = { xyz: pose.base.xyz.slice(), rpy: pose.base.rpy.slice() };
 
+    // ... and the planning goal, which is the same pose expressed as a
+    // q vector. Built here rather than inside the planner so that one
+    // thing -- params.goal_config -- is the goal, whichever of the three
+    // ways set it.
+    if (params.qmap) {
+        params.goal_config = configurationFromPose(params.qmap, pose);
+        params.goal_source = 'slot ' + slot;
+    }
+
     params.setpoint_slot = slot;
-    console.log('kineval: pose setpoint ' + slot + ' loaded as planning goal / servo target');
+    setStatusMessage(params, 'goal set from slot ' + slot);
+    console.log('kineval: pose setpoint ' + slot + ' loaded as the planning goal and servo target');
+}
+
+// A stored pose -> a q vector, using the same layout collision.js derived.
+function configurationFromPose(qmap, pose) {
+    var q = new Array(qmap.length);
+    q[0] = pose.base.xyz[0]; q[1] = pose.base.xyz[1]; q[2] = pose.base.xyz[2];
+    q[3] = pose.base.rpy[0]; q[4] = pose.base.rpy[1]; q[5] = pose.base.rpy[2];
+    var x;
+    for (x in qmap.names) {
+        q[qmap.names[x]] = (pose.joints[x] === undefined) ? 0 : pose.joints[x];
+    }
+    return q;
 }
 
 function printPoseSetpoints(params) {
     console.log('kineval: pose setpoints', params.pose_setpoints || {});
+    var filled = Object.keys(params.pose_setpoints || {});
+    setStatusMessage(params, filled.length
+        ? 'slots in use: ' + filled.join(', ') + ' (printed to console)'
+        : 'no slots stored yet');
+}
+
+// A short-lived line in the HUD. Timestamped rather than cleared by a
+// timer, so nothing has to be torn down on a robot or world switch.
+function setStatusMessage(params, text) {
+    params.status_message = text;
+    params.status_message_at = Date.now();
 }
 // #endregion pose-setpoints
 
@@ -254,8 +297,10 @@ var HELP_TEXT =
     '<br>motion planning (RRT-Connect)' +
     '<br>Shift+1..9 : store the current pose in a setpoint slot' +
     '<br>1..9 : load a slot as the planning goal' +
+    '<br>&nbsp;&nbsp;&nbsp;&nbsp;(buttons: Set Goal, Plan to Goal, Goal Ghost)' +
+    '<br>&nbsp;&nbsp;&nbsp;&nbsp;default goal: the zero configuration at the world origin' +
     '<br>g : print the setpoint slots to the console' +
-    '<br>m : plan from the current pose to the loaded goal' +
+    '<br>m : plan from the current pose to the goal (= the Plan to Goal button)' +
     '<br>n/b : step forward/back through a found plan' +
     '<br>&nbsp;' +
     '<br>t : frame the camera on the whole world' +

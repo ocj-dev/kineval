@@ -731,18 +731,40 @@ function smoothPath(robot, qmap, world, path, weights, counters, validation) {
 /////   THE PLANNER
 //////////////////////////////////////////////////
 
-// #region robot-rrt-planner-init
-// Prepares a plan from the robot's current pose to the active pose
-// setpoint, and resets everything a run owns.
+// #region zero-configuration
+// The zero configuration at the world origin: base at (0,0,0) with no
+// rotation, every joint at 0.
 //
-// GOAL CONVENTION. Upstream plans to the ZERO configuration at the world
-// origin (kineval_rrt_connect.js:128-131, and the assignment slide says so
-// too). This plans to params.setpoint_target instead -- the pose stored in
-// a slot with Shift+[1-9] and selected with [1-9]. The zero configuration
-// is frequently in collision, and when it is, every world produces the
-// same unsolvable query and the planner looks broken. A pose the user
-// chose by driving the robot there is reachable by construction.
-// Divergence recorded in IMPLEMENTATION_NOTES.md.
+// THIS IS THE DEFAULT PLANNING GOAL, matching upstream
+// (kineval_rrt_connect.js:128-131, `for (i=0;...) q_goal_config[i] = 0`)
+// and matching the assignment the collision lecture states: "generate a
+// collision free motion plan to the world origin and zero joint angle
+// configuration".
+//
+// An earlier version of this file defaulted the goal to the active pose
+// setpoint instead, reasoning that the zero configuration is sometimes
+// itself in collision. That reasoning was right about the risk and wrong
+// about the consequence: with no setpoint stored, the goal silently
+// became the START configuration, so pressing `m` "solved" a zero-length
+// problem in one iteration and the planner appeared never to run at all.
+// A default that is occasionally unsolvable -- and says so -- is far
+// better than one that is always trivially solved.
+function zeroConfiguration(qmap) {
+    var q = new Array(qmap.length);
+    var i;
+    for (i = 0; i < qmap.length; i++) q[i] = 0;
+    return q;
+}
+// #endregion zero-configuration
+
+// #region robot-rrt-planner-init
+// Prepares a plan from the robot's current pose to the goal, and resets
+// everything a run owns.
+//
+// GOAL CONVENTION. The goal is params.goal_config when one has been set
+// -- by the "Set Goal" button, or by loading a pose-setpoint slot with
+// [1-9] -- and otherwise the ZERO CONFIGURATION AT THE WORLD ORIGIN,
+// which is upstream's own convention. See zeroConfiguration above.
 //
 // Re-seeds the generator, so planning twice from the same start, goal and
 // seed replays the identical run. Phase 4 asserts it.
@@ -750,24 +772,9 @@ function robotRRTPlannerInit(robot, qmap, world, params) {
     seedRandom(params.seed);
 
     var qStart = configurationFromRobot(robot, qmap);
-
-    // the goal: the start configuration with every joint that has a
-    // setpoint overridden by it. Base DOFs come along from the start,
-    // since a setpoint slot stores joint angles and a base pose together.
-    var qGoal = qStart.slice();
-    var setpoint = params.setpoint_target || {};
-    var x;
-    for (x in qmap.names) {
-        if (setpoint[x] !== undefined) qGoal[qmap.names[x]] = setpoint[x];
-    }
-    if (params.setpoint_base) {
-        qGoal[Q_BASE_X] = params.setpoint_base.xyz[0];
-        qGoal[Q_BASE_Y] = params.setpoint_base.xyz[1];
-        qGoal[Q_BASE_Z] = params.setpoint_base.xyz[2];
-        qGoal[Q_BASE_ROLL] = params.setpoint_base.rpy[0];
-        qGoal[Q_BASE_PITCH] = params.setpoint_base.rpy[1];
-        qGoal[Q_BASE_YAW] = params.setpoint_base.rpy[2];
-    }
+    var qGoal = (params.goal_config && params.goal_config.length === qmap.length)
+        ? params.goal_config.slice()
+        : zeroConfiguration(qmap);
 
     var weights = configurationWeights(robot, qmap, world);
     var counters = { collisionChecks: 0, nearestNeighborComparisons: 0 };
@@ -806,6 +813,13 @@ function robotRRTPlannerInit(robot, qmap, world, params) {
         counters: counters,
         iterations: 0,
         state: 'planning',
+        // The outcome of the most recent EXTEND and CONNECT, in the
+        // algorithm's own three-valued vocabulary. `state` says what the
+        // whole run is doing (planning / found / failed); these say what
+        // the last step did, which is what makes the search legible
+        // while it is running rather than only after it stops.
+        lastExtend: '-',
+        lastConnect: '-',
         // T_a always holds the tree currently being EXTENDED. The two swap
         // every iteration, so this flag is what remembers which end of the
         // final path is the start.
@@ -813,6 +827,16 @@ function robotRRTPlannerInit(robot, qmap, world, params) {
         startedAt: Date.now(),
         elapsedMs: 0
     };
+
+    // A goal identical to the start is not an error, but it is almost
+    // always a mistake, and silently returning a two-configuration path
+    // is exactly how this module once appeared not to be running at all.
+    // Say so instead.
+    if (configurationDistance(qStart, qGoal, weights) < 1e-9) {
+        planner.state = 'failed';
+        planner.failureReason = 'goal is identical to the start configuration -- drive the robot away (w/s/a/d) and plan again, or press Set Goal somewhere else';
+        return planner;
+    }
 
     // refuse to start from or aim at a configuration that is already in
     // collision. Both are ordinary user mistakes -- drive into a wall,
@@ -876,11 +900,13 @@ function robotRRTPlannerIterate(robot, qmap, world, params, planner) {
     // 1. extend tree A one step toward a uniformly random configuration
     var qRand = randomConfig(robot, qmap, world, params, planner.qStart);
     var extendResult = rrtExtend(robot, qmap, world, planner.T_a, qRand, weights, step, counters, planner.validation);
+    planner.lastExtend = extendResult;
 
     if (extendResult !== 'trapped') {
         // 2. greedily connect tree B toward A's newest vertex
         var qNew = planner.T_a.vertices[planner.T_a.newest].vertex;
         var connectResult = rrtConnect(robot, qmap, world, planner.T_b, qNew, weights, step, counters, planner.validation);
+        planner.lastConnect = connectResult;
 
         if (connectResult === 'reached') {
             // the trees met: A's newest vertex and B's newest vertex are

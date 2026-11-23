@@ -14,7 +14,8 @@ the module draws every random choice from one seeded generator
 
 | File | URL | Start / goal | What it shows |
 |---|---|---|---|
-| `viewer_local_minima.png` | `kineval/?robot=mr2&world=local_minima&seed=2024` | sampled free | The three-sphere pocket that traps greedy and potential-field methods. The path routes around it. |
+| `viewer_local_minima.png` | `kineval/?robot=mr2&world=local_minima&seed=2024` | base (-2.6, 2.4) → the default goal | The three-sphere pocket, the search tree flat on the ground, the translucent goal ghost at the origin, and the robot part-way along the plan at index 3/5. |
+| `viewer_goal_ghost.png` | `kineval/?robot=mr2&world=basic&seed=77` | base (-3.4, -3.2) → the default goal | The goal ghost on its own: a translucent copy of the robot's own geometry standing at the zero configuration at the world origin. |
 | `viewer_y.png` | `kineval/?robot=mr2&world=y&seed=2024` | opposite sides of the gate | The genuinely 3D world: two low spheres and one overhead at `y = 5.0`. Disproves the "x-z plane only" comment every upstream world file carries. |
 | `viewer_narrow_passage.png` | `kineval/?robot=mr2&world=narrow_passage&seed=2024` | opposite sides of the wall | The gap sized to the robot. 8052 collision checks against 724 nearest-neighbour comparisons — the cost model, in one picture. |
 | `viewer_bug_trap.png` | `kineval/?robot=mr2&world=bug_trap&seed=909` | inside the pocket → outside | Why a second tree matters: the tree rooted inside the trap cannot easily get out; the one rooted outside has no such problem. |

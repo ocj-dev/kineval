@@ -229,14 +229,37 @@ of yaw — a zero-length edge, swept the long way round, through a wall the
 robot never passed through. The planner was right and the test was wrong,
 which is the worst way for a test to fail.
 
-### Goal convention
+### Goal convention — and a default that made the planner look broken
 
-Upstream plans to the **zero configuration at the world origin**
-(`kineval_rrt_connect.js:128-131`; the assignment slides say so too). This
-plans to the **active pose-setpoint slot** — `Shift+[1-9]` stores the
-current pose, `[1-9]` loads it as the goal. The zero configuration is
-frequently itself in collision, and when it is, every world produces the
-same unsolvable query and the planner looks broken.
+The goal is **`params.goal_config`**, one q vector, set in exactly three
+ways: the **Set Goal** button (the current configuration), loading a
+pose-setpoint slot with `[1-9]`, or the default. One field, so there is
+one answer to "what is the goal", and the HUD names its source.
+
+**The default is the zero configuration at the world origin**, matching
+upstream (`kineval_rrt_connect.js:128-131`) and the assignment the
+collision lecture states: *"generate a collision free motion plan to the
+world origin and zero joint angle configuration"*.
+
+An earlier version defaulted to the active setpoint slot instead,
+reasoning that the zero configuration is sometimes itself in collision.
+That reasoning was right about the risk and **badly wrong about the
+consequence**. With no slot stored, `setpoint_target` is `{}`, so the
+goal silently became the **start** configuration — and pressing `m`
+"solved" a zero-length problem in one iteration, reporting `found` with a
+two-configuration path. The planner appeared never to run at all. It was
+reported as exactly that.
+
+Two lessons worth keeping:
+
+- **A default that is occasionally unsolvable, and says so, beats one
+  that is always trivially solved.** The failure mode of the first is a
+  readable message; the failure mode of the second is a user concluding
+  the feature is broken.
+- **A goal equal to the start is now refused explicitly**, with a message
+  telling the user to drive away or press Set Goal. It is not an error in
+  the algorithm, but it is always a mistake in the query, and silence
+  about it was the whole bug.
 
 The setpoint slots store the **base pose as well as** the joint angles,
 which upstream's joint-only setpoints do not. Without that, "plan to slot
@@ -246,6 +269,74 @@ the base moving at all.
 
 Both ends of a query are checked for collision up front and refused with a
 readable reason, rather than planned from and silently never solved.
+
+### `Shift+[1-9]` never worked, because of `e.key`
+
+Storing a slot was dead code from the day it was written. The handler
+read `e.key >= '1' && e.key <= '9'` and branched on `e.shiftKey` — and
+**`Shift+3` does not produce `'3'`**. On a US layout it produces `'#'`;
+on other layouts, something else again. So the shifted branch was
+unreachable and storing a slot did nothing, silently.
+
+The fix is to key on **`e.code`** (`Digit1`…`Digit9`), which is the
+physical key and is layout-independent. The in-code comment that
+asserted the opposite is gone.
+
+Found by a headless test pressing the key and reading the event back,
+not by reading the code — the code looked obviously right.
+
+### What the HUD shows, and why
+
+The line under `active joint` reports, every frame:
+
+```
+planner = found   extend = advanced   connect = reached
+iterations = 1066   tree configs = 282 (start 274, goal 8)
+```
+
+`state` is what the whole run is doing (`idle` / `planning` / `found` /
+`failed`); `extend` and `connect` are the **algorithm's own three-valued
+step results**, which is what makes a search in progress legible rather
+than a spinning counter. Tree sizes are reported as **start** and
+**goal**, never as A and B: `T_a` and `T_b` swap every iteration, so
+A/B labels would make both numbers jump between meanings twice a second.
+The two names match the two tree colours on the ground plane.
+
+Slot stores, slot loads and goal changes post a timestamped
+`status_message` that the HUD shows for six seconds. A keystroke that
+changes the planning goal and gives no feedback is indistinguishable from
+one that did nothing — which is how the `Shift+[1-9]` bug survived.
+
+### The goal ghost
+
+`scene.js#buildGoalGhost` makes a translucent copy of the robot at the
+goal configuration, posed each frame from
+`collisionForwardKinematics(robot, qmap, goal_config)` — the **pure**
+traversal, reused to ask "what would this pose look like" instead of
+"would this pose collide". Using the rendering FK here would overwrite
+the live robot's own transforms, which is the entire reason the pure
+version exists.
+
+It **shares each link's geometry** with the live robot, so the ghost is
+exactly the robot rather than an approximation, and therefore must never
+dispose that geometry — `removeRobotMeshes` owns it, and the ghost is
+torn down first on a robot switch. `depthWrite: false` keeps the
+translucent links from occluding each other in draw order, which
+otherwise reads as a solid object with holes in it.
+
+### Ground-plane indicators
+
+Tree vertices are drawn **flat on the ground**, not at the
+configuration's own base height. Upstream puts its cube at the base
+location (`add_config_origin_indicator_geom`), which is wrong for two of
+this viewer's robots: the crawler's base origin sits at y = 1 and
+fetch's at y = 0.1, so their search trees floated in mid-air at a height
+that had nothing to do with the search. On the ground, the picture is
+what it actually is — a plan view of where the base went — and two
+robots of different heights are directly comparable.
+
+Marker size scales with the world (`span * 0.008`): the previous fixed
+0.06 was invisible in `world_random`'s 52-metre boundary.
 
 ---
 
@@ -590,3 +681,45 @@ node /ai/development/misc/autorob_kineval_motion_planning_verify.mjs --shots  # 
 It drives the real pages under headless Chromium. No test body names a
 robot; every property test runs over the cross product of registered robots
 and worlds.
+
+---
+
+## Measuring anything on this machine: beware your own background jobs
+
+Recorded because it nearly produced a false bug report during the
+goal-convention work.
+
+`world_sealed_enclosure` with mr2 runs a fixed 5000 iterations and a
+fixed 71 804 collision checks every time — the work is deterministic.
+Its **wall-clock time over one afternoon, on identical code**, was:
+
+| | |
+|---|---|
+| 8.0 s | nothing else running |
+| 11.1 s, 11.7 s | nothing else running |
+| 14.9 s, 28.3 s | one background suite running |
+| 62.5 s, 81.8 s, 99.8 s | two or three background jobs running |
+
+A **12x spread**, with iteration and collision-check counts identical
+throughout. Chasing the 81.8 s figure as a regression cost a profiling
+pass and a checkout of the previous commit to disprove; the new code
+then measured *faster* than the old once the machine was quiet.
+
+Two consequences:
+
+- **Wall-clock assertions must be hang detectors, not performance
+  tests.** Phase 4's termination check now allows 300 s and separately
+  asserts the thing that actually matters — that the planner stops *at
+  the iteration cap* rather than by running out of time. That assertion
+  is load-independent.
+- **Profile before attributing.** The profiling pass was still worth it:
+  it showed 94% of the time is inside `poseIsCollision` at ~1.3 ms per
+  call, against ~40 µs in `world_barrier`. The difference is obstacle
+  count — 99 stacked spheres versus 11 — and it is a genuine property of
+  the cost model, not of the change under suspicion. A free configuration
+  is also more expensive to verify than a colliding one, because "no
+  collision" has to exhaust every link-obstacle pair while a collision
+  returns early.
+
+Related: the same failure mode is recorded for `cargo test` in the
+pubsub module.

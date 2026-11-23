@@ -1952,31 +1952,88 @@ iteration costs wildly different amounts across the six robots.
 layout: default
 ---
 
-# Goal selection, and a divergence
+# Goal selection, and a default that hid a bug
 
 <div class="split-panel">
 <div class="panel">
 
-<<< ../reference/motion_plan.js#robot-rrt-planner-init {*}{lines:true,maxHeight:'350px'}
+<<< ../reference/motion_plan.js#zero-configuration {*}{lines:true,maxHeight:'180px'}
+
+<<< ../reference/motion_plan.js#robot-rrt-planner-init {*}{lines:true,maxHeight:'165px'}
 
 </div>
 <div class="panel text-sm">
 
-The assignment, and upstream, plan to **the zero configuration at the world origin**.
-
-This plans to **the active pose-setpoint slot** instead, because the zero configuration is
-frequently itself in collision — and when it is, every world produces the same unsolvable query
-and the planner looks broken.
+One field is the goal — `params.goal_config` — set three ways: the **Set Goal** button, loading
+a slot with `[1-9]`, or the default. The default is **the zero configuration at the world
+origin**, which is upstream's own convention and the assignment the collision lecture states.
 
 <div class="meaning">
-<b>Slots store the base pose too</b>
-Upstream's setpoints are joint-only. Without the base, "plan to slot 1" would mean "reach that
-arm configuration wherever you happen to be standing", and thirteen of the fourteen worlds would
-be solvable without the base moving at all.
+<b>A default that is sometimes unsolvable beats one that is always trivially solved</b>
+An earlier version defaulted to the active setpoint slot, to avoid a zero configuration that is
+sometimes itself in collision. With no slot stored, the goal silently became the <b>start</b>
+configuration — so pressing <code>m</code> "solved" a zero-length problem in one iteration and
+reported <code>found</code>. The planner appeared never to run at all.
 </div>
 
-Both ends are checked for collision up front and refused with a readable reason, rather than
-planned from and silently never solved.
+A goal equal to the start is now **refused explicitly**. It is not an error in the algorithm,
+but it is always a mistake in the query, and saying nothing about it was the entire bug.
+
+</div>
+</div>
+
+---
+layout: default
+---
+
+# Watching the search
+
+<div class="split-panel">
+<div class="panel text-sm">
+
+The line under `active joint`, every frame:
+
+```
+planner = found   extend = advanced   connect = reached
+iterations = 1066   tree configs = 282 (start 274, goal 8)
+```
+
+`state` is what the whole run is doing. **`extend` and `connect` are the algorithm's own
+three-valued step results** — the same `Reached` / `Advanced` / `Trapped` from the pseudocode
+eighty slides ago — which is what makes a search in progress legible instead of a spinning
+counter.
+
+<div class="meaning">
+<b>Start and goal, never A and B</b>
+<code>T_a</code> and <code>T_b</code> swap every iteration, so labelling the two tree sizes A
+and B would make both numbers jump between meanings twice a second. They are reported by which
+END they grew from, matching their two colours on the ground.
+</div>
+
+</div>
+<div class="panel text-sm">
+
+### Two things the viewer draws
+
+<img src="/images/viewer_goal_ghost.png" alt="The viewer with a translucent green robot standing at the world origin, the goal configuration, and the live robot elsewhere" class="shot" />
+
+**The search, on the ground plane.** One marker per tree vertex, at that configuration's base
+location, flattened to the floor. Upstream draws its cube at the base *origin* — which for the
+crawler is a metre up, so its tree floats in mid-air at a height unrelated to the search.
+
+**The goal, as a ghost.** A translucent copy of the robot's own geometry, posed by
+`collisionForwardKinematics` at the goal configuration — the *pure* traversal, reused to ask
+"what would this pose look like" rather than "would it collide". Using the rendering FK here
+would overwrite the live robot's transforms, which is the whole reason the pure one exists.
+
+<div class="history-note">
+<b>Shift+[1-9] never worked</b>
+The handler read <code>e.key >= '1' && e.key <= '9'</code> and branched on
+<code>e.shiftKey</code>. But <b>Shift+3 does not produce '3'</b> — on a US layout it produces
+'#'. The shifted branch was unreachable and storing a slot did nothing, silently. Keyed on
+<code>e.code</code> now, which is the physical key. Found by a test pressing it, not by reading
+the code.
+</div>
 
 </div>
 </div>
