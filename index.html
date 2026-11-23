@@ -19,6 +19,7 @@
   .status.planned { background: #fef3c4; color: #7a5b00; }
   .status.partial { background: #dce8fb; color: #1a4b8c; }
   footer { margin-top: 2.5em; font-size: 0.85em; color: #5f6368; }
+  .note { max-width: 52em; margin: 0.4em auto 0; font-size: 0.86em; opacity: 0.72; line-height: 1.45; }
 </style>
 </head>
 <body>
@@ -37,7 +38,12 @@
   <h2>Additional Modules</h2>
   <ul>
     <li><a class="title" href="/kineval/cloth_simulation/">2D Cloth Simulation</a><span class="status built">Built</span></li>
+    <li><a class="title" href="/kineval/behavior_trees/">Behavior Trees</a><span class="status built">Built</span></li>
   </ul>
+  <p class="note">The Behavior Trees module teaches the Rust publish-subscribe system
+  (<code>pubsub_testbed_rs</code>) rather than the KinEval JavaScript viewer: how a motion plan
+  is represented as a <code>JointTrajectory</code> message, executed by a JointTrajectory action,
+  and sequenced inside a behavior tree.</p>
 
   <footer>Source: <a href="https://github.com/ocj-dev/kineval">github.com/ocj-dev/kineval</a> &middot; reference implementation derived from <a href="https://github.com/autorob/kineval-stencil">autorob/kineval-stencil</a></footer>
 </div>

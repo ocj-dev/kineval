@@ -31,6 +31,7 @@ jobs:
             forward_kinematics/slides/package-lock.json
             inverse_kinematics/slides/package-lock.json
             motion_planning/slides/package-lock.json
+            behavior_trees/slides/package-lock.json
 
       - name: Build the pathfinding Slidev deck
         working-directory: pathfinding/slides
@@ -68,6 +69,12 @@ jobs:
           npm install
           npm run build
 
+      - name: Build the behavior_trees Slidev deck
+        working-directory: behavior_trees/slides
+        run: |
+          npm install
+          npm run build
+
       - name: Assemble the site
         run: |
           mkdir -p site
@@ -78,6 +85,7 @@ jobs:
           cp -r forward_kinematics/slides/dist site/forward_kinematics
           cp -r inverse_kinematics/slides/dist site/inverse_kinematics
           cp -r motion_planning/slides/dist site/motion_planning
+          cp -r behavior_trees/slides/dist site/behavior_trees
           # kineval/ is copied as a SOURCE tree, not a built one, and that
           # asymmetry with every other module here is deliberate: the full
           # viewer is buildless (plain <script src> plus one ES module), so
@@ -121,6 +129,15 @@ jobs:
           mkdir -p site/motion_planning/reference
           cp -r motion_planning/reference/. site/motion_planning/reference/
           cp site/motion_planning/reference/search_canvas.html site/motion_planning/reference/index.html
+          # same idea again for the behavior-trees reference snapshots.
+          # Unlike every other module's reference/, this one is not a
+          # runnable app -- it is dated snapshots of Rust from a DIFFERENT
+          # repository (pubsub_testbed_rs) plus the recorded tick traces,
+          # carried here because Slidev's <<< importer cannot read across
+          # repositories. There is no entry page to alias to index.html;
+          # the files are served so a reader can check a citation.
+          mkdir -p site/behavior_trees/reference
+          cp -r behavior_trees/reference/. site/behavior_trees/reference/
           # GitHub Pages only ever consults a 404.html at the site root, and
           # each Slidev deck is its own separately-built SPA with its own JS
           # bundle -- one deck's 404.html can't correctly bootstrap another
@@ -135,7 +152,7 @@ jobs:
           <body>
           <script>
             var path = window.location.pathname;
-            var decks = ['pathfinding', 'cloth_simulation', 'simulation', 'forward_kinematics', 'inverse_kinematics', 'motion_planning'];
+            var decks = ['pathfinding', 'cloth_simulation', 'simulation', 'forward_kinematics', 'inverse_kinematics', 'motion_planning', 'behavior_trees'];
             var target = '/kineval/';
             for (var i = 0; i < decks.length; i++) {
               if (path.indexOf('/kineval/' + decks[i] + '/') === 0) {
