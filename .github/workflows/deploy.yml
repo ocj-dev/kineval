@@ -134,8 +134,10 @@ jobs:
           # runnable app -- it is dated snapshots of Rust from a DIFFERENT
           # repository (pubsub_testbed_rs) plus the recorded tick traces,
           # carried here because Slidev's <<< importer cannot read across
-          # repositories. There is no entry page to alias to index.html;
-          # the files are served so a reader can check a citation.
+          # repositories. There is no app to alias to index.html, so the
+          # directory carries a hand-written index.html of its own that
+          # lists each snapshot with its upstream path, length and commit;
+          # it is copied along with the files by the line below.
           mkdir -p site/behavior_trees/reference
           cp -r behavior_trees/reference/. site/behavior_trees/reference/
           # GitHub Pages only ever consults a 404.html at the site root, and

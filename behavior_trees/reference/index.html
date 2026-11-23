@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Behavior Trees — reference snapshots</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #202124; margin: 0; padding: 3em 1.5em; }
+  .wrap { max-width: 50em; margin: 0 auto; }
+  h1 { margin-bottom: 0.1em; }
+  .sub { color: #5f6368; margin-top: 0; line-height: 1.5; }
+  h2 { font-size: 1.05em; color: #5f6368; text-transform: uppercase; letter-spacing: 0.04em; margin: 2em 0 0.6em; }
+  ul { list-style: none; padding: 0; }
+  li { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px #00000022; margin-bottom: 0.8em; padding: 0.9em 1.3em; }
+  a.title { font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #1a73e8; text-decoration: none; }
+  a.title:hover { text-decoration: underline; }
+  .meta { font-size: 0.82em; color: #5f6368; margin-top: 0.3em; line-height: 1.5; }
+  code { font-size: 0.92em; }
+  .warn { background: #fff7ef; border-left: 3px solid #E8710A; border-radius: 0 10px 10px 0; padding: 0.8em 1.1em; font-size: 0.9em; line-height: 1.5; }
+  footer { margin-top: 2.5em; font-size: 0.85em; color: #5f6368; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Behavior Trees — reference snapshots</h1>
+  <p class="sub">The source the <a href="/kineval/behavior_trees/">Behavior Trees deck</a> quotes, and the
+  recorded traces its interactive panels replay.</p>
+
+  <p class="warn"><b>These are snapshots, not the implementation.</b> Unlike every other module
+  in this repository, this module's <code>reference/</code> is not a runnable page: the system it
+  teaches is the Rust publish-subscribe testbed <code>pubsub_testbed_rs</code>, a different
+  repository. Slidev's <code>&lt;&lt;&lt;</code> snippet importer cannot read outside its own
+  workspace root, so each quoted file is carried here as a dated copy. Every file's header gives
+  its source path, upstream length, commit hash, snapshot date, and the upstream line number of
+  each <code>#region</code> marker &mdash; the header shifts every line down, so a line number in
+  the copy is <i>not</i> the line number upstream. Edits belong upstream.</p>
+
+  <h2>Rust sources &middot; commit <code>d9e34cd</code>, snapshotted 2026-11-23</h2>
+  <ul>
+    <li>
+      <a class="title" href="bt_node.rs">bt_node.rs</a>
+      <div class="meta"><code>src/bin/bt_node.rs</code> &middot; 1389 lines upstream &mdash;
+      the behavior-tree node: tick semantics for sequence and selector, the blackboard,
+      load-time validation, and <code>/bt/status</code>.</div>
+    </li>
+    <li>
+      <a class="title" href="joint_trajectory_action_node.rs">joint_trajectory_action_node.rs</a>
+      <div class="meta"><code>src/bin/joint_trajectory_action_node.rs</code> &middot; 710 lines upstream &mdash;
+      the action server that walks a <code>JointTrajectory</code> point by point, gating each on
+      arrival, and reports feedback, result and preemption.</div>
+    </li>
+    <li>
+      <a class="title" href="robot_sim_node.rs">robot_sim_node.rs</a>
+      <div class="meta"><code>src/bin/robot_sim_node.rs</code> &middot; 1714 lines upstream &mdash;
+      the simulator. Its <code>apply_trajectory</code> is why publishing a trajectory on a topic
+      is not the same as executing it.</div>
+    </li>
+    <li>
+      <a class="title" href="fsm_node.rs">fsm_node.rs</a>
+      <div class="meta"><code>src/bin/fsm_node.rs</code> &middot; 982 lines upstream &mdash;
+      the finite-state-machine node, for the comparison section. It is an interpreter: its
+      transitions are data loaded at runtime, not lines of source.</div>
+    </li>
+  </ul>
+
+  <h2>Recorded traces &middot; commit <code>4a1b4fe</code>, recorded 2026-11-22</h2>
+  <p class="sub" style="font-size:0.9em">Emitted by <code>tests/bt_node_motion.rs</code> in
+  <code>pubsub_testbed_rs</code>, running <code>robots/student/generic_6dof_arm.urdf</code>.
+  The panels in the deck replay these; none of the animation data is hand-authored.</p>
+  <ul>
+    <li>
+      <a class="title" href="traces/bt_motion_plan_and_execute.json">traces/bt_motion_plan_and_execute.json</a>
+      <div class="meta">19 ticks &mdash; plan, then execute the resulting trajectory through the
+      action. Produced by <code>cargo test --test bt_node_motion
+      records_bt_motion_traces_for_the_decks</code>.</div>
+    </li>
+    <li>
+      <a class="title" href="traces/bt_motion_preempt.json">traces/bt_motion_preempt.json</a>
+      <div class="meta">10 ticks &mdash; the same tree with the execution preempted part way
+      through.</div>
+    </li>
+  </ul>
+
+  <footer>Source: <a href="https://github.com/ocj-dev/kineval">github.com/ocj-dev/kineval</a>
+  &middot; <a href="/kineval/">all modules</a></footer>
+</div>
+</body>
+</html>
